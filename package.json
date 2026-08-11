@@ -1,0 +1,18 @@
+{
+  "name": "telehealth-backend",
+  "version": "1.0.0",
+  "description": "Backend API for the telehealth application",
+  "main": "index.js",
+  "packageManager": "bun@1.3.12",
+  "scripts": {
+    "dev": "bun --watch index.js",
+    "start": "bun index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
