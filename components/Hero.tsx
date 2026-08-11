@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowRight, DollarSign, PackageCheck, Stethoscope, Smartphone } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { DotPattern } from "@/components/ui/dot-pattern";
 
 interface HeroProps {
@@ -30,13 +30,6 @@ export default function Hero({ onOpenChat }: HeroProps) {
       image: "/images/card_kusam.png",
       query: "Kulit muka gue kusam dan gampang berminyak, butuh saran produk yang pas."
     }
-  ];
-
-  const valueProps = [
-    { icon: DollarSign, label: "HARGA TRANSPARAN & TANPA BIAYA TERSEMBUNYI" },
-    { icon: PackageCheck, label: "DIKIRIM LANGSUNG KE DEPAN RUMAH" },
-    { icon: Stethoscope, label: "FORMULASI TERUJI ILMIAH" },
-    { icon: Smartphone, label: "100% KONSULTASI ONLINE" }
   ];
 
   return (
@@ -73,12 +66,12 @@ export default function Hero({ onOpenChat }: HeroProps) {
           </h1>
 
           <p className="text-base sm:text-lg lg:text-xl text-[#C2D6CB] max-w-2xl mx-auto font-normal leading-relaxed">
-            Solusi perawatan kulit via AI dan telehealth — simpel, langsung, dan dipandu formulasi teruji.
-            Tanpa antre ruang tunggu. Tanpa langkah ribet. Hasil nyata.
+            Curhatin masalah jerawat, dark spot, atau breakout ke DermAssistant.
+            Dapet racikan formulasi yang pas buat kondisi kulit lo tanpa perlu antre di klinik.
           </p>
         </div>
 
-        {/* Floating 4 Categories Cards Overlay (Overlapping bottom) */}
+        {/* Floating 4 Categories Cards Overlay */}
         <div className="mt-16 lg:mt-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {categoryCards.map((card, idx) => (
@@ -109,21 +102,6 @@ export default function Hero({ onOpenChat }: HeroProps) {
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Ticker / Value Proposition Bar below the hero */}
-      <div className="mt-16 pt-8 border-t border-white/10 bg-[#0E2319]/60 backdrop-blur-sm overflow-x-auto no-scrollbar relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between min-w-max gap-8 text-xs font-bold tracking-wider text-[#A3D9C0] uppercase">
-          {valueProps.map((prop, idx) => {
-            const Icon = prop.icon;
-            return (
-              <div key={idx} className="flex items-center gap-2.5">
-                <Icon className="w-4 h-4 text-[#81C7A2]" />
-                <span>{prop.label}</span>
-              </div>
-            );
-          })}
         </div>
       </div>
     </section>
