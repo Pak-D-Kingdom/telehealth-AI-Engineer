@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { MessageSquare, X, Send, Bot, User, Sparkles, RefreshCw, ChevronDown } from "lucide-react";
+import Image from "next/image";
+import { MessageSquare, X, Send, User, Sparkles, ChevronDown, CheckCircle2, ArrowRight } from "lucide-react";
 
 interface Message {
   id: string;
@@ -12,6 +13,7 @@ interface Message {
     name: string;
     type: string;
     reason: string;
+    image?: string;
   }>;
 }
 
@@ -27,7 +29,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     {
       id: "1",
       sender: "ai",
-      text: "Halo. Gue DermAssistant MySkin. Lagi ada kendala apa nih sama kulit muka lo hari ini? Coba ceritain detail jerawat, flek hitam, atau breakout yang lagi bikin pusing.",
+      text: "Halo! Gue DermAssistant MySkin. Lagi ada kendala apa nih sama kulit muka lo hari ini? Coba ceritain detail jerawat, flek hitam, atau breakout yang lagi bikin pusing.",
       timestamp: "Baru saja"
     }
   ]);
@@ -55,49 +57,55 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     let recs: Message["recommendations"] = undefined;
 
     if (textLower.includes("jerawat") || textLower.includes("acne") || textLower.includes("meradang")) {
-      replyText = "Buat masalah jerawat meradang, kuncinya adalah menenangan peradangan dulu dan ngontrol minyak tanpa ngerusak skin barrier. Jangan dipencet ya!";
+      replyText = "Buat masalah jerawat meradang, kuncinya adalah menenangkan peradangan dulu dan mengontrol minyak tanpa merusak skin barrier. Jangan dipencet ya!";
       recs = [
         {
           name: "Lumina Salicylic Acid 2% Serum",
-          type: "Serum Exfoliating Mild",
-          reason: "Membersihkan pori-pori tersumbat dan meredakan kemerahan jerawat aktif."
+          type: "Targeted Serum",
+          reason: "Membersihkan pori-pori tersumbat dan meredakan kemerahan jerawat aktif.",
+          image: "/images/serum.png"
         },
         {
           name: "Gentle Centella Cleansing Gel",
-          type: "Facial Wash pH Balanced",
-          reason: "Membersihkan wajah tanpa sensasi ditarik atau bikin kulit makin kering."
+          type: "Facial Wash",
+          reason: "Membersihkan wajah tanpa sensasi kulit ketarik atau makin kering.",
+          image: "/images/cream.png"
         }
       ];
     } else if (textLower.includes("dark spot") || textLower.includes("flek") || textLower.includes("bekas")) {
-      replyText = "Noda hitam atau PIH bekas jerawat butuh waktu buat pudar, tapi kombinasi agen pencerah yang lembut bakal mempercepat prosesnya secara signifikan.";
+      replyText = "Noda hitam atau PIH bekas jerawat butuh waktu buat pudar, tapi kombinasi agen pencerah yang lembut bakal mempercepat prosesnya secara aman.";
       recs = [
         {
           name: "Lumina Niacinamide 5% + Alpha Arbutin",
-          type: "Serum Pencerah Noda Hitam",
-          reason: "Menghambat pembentukan pigmentasi melanin dan menyamarkan noda hitam bekas jerawat."
+          type: "Serum Pencerah",
+          reason: "Menghambat penumpukan pigmen melanin dan menyamarkan noda hitam bekas jerawat.",
+          image: "/images/serum.png"
         },
         {
           name: "Ultra Shield Sunscreen SPF 50 PA++++",
-          type: "Sunscreen Invisible Finish",
-          reason: "Mencegah noda hitam makin menghitam akibat paparan sinar UV harian."
+          type: "Sunscreen Mild",
+          reason: "Mencegah noda hitam makin menghitam akibat paparan sinar UV harian.",
+          image: "/images/cream.png"
         }
       ];
     } else if (textLower.includes("breakout") || textLower.includes("barrier") || textLower.includes("perih")) {
-      replyText = "Kalau kulit muka terasa perih dan breakout parah, stop dulu semua bahan aktif keras (kayak AHA/BHA/Retinol). Fokus ke basic skincare buat balikin kondisi lapisan kulit.";
+      replyText = "Kalau kulit terasa perih dan breakout parah, stop dulu semua bahan aktif keras (kayak AHA/BHA/Retinol). Fokus ke basic skincare buat memulihkan lapisan kulit.";
       recs = [
         {
           name: "Oak & Ash Ceramide Repair Cream",
-          type: "Moisturizer Skin Barrier",
-          reason: "Memperbaiki struktur lipid kulit yang rusak dan mengunci hidrasi."
+          type: "Barrier Cream",
+          reason: "Memperbaiki struktur lipid kulit yang terkelupas dan mengunci kelembapan.",
+          image: "/images/cream.png"
         }
       ];
     } else {
-      replyText = "Paham. Masalah kulit muka emang butuh perhatian khusus. Untuk penanganan tepat, disarankan konsisten pakaikan cleanser lembut, moisturizer pelembap, dan selalu tutup dengan sunscreen tiap pagi.";
+      replyText = "Paham. Masalah kulit muka butuh perhatian khusus. Disarankan konsisten gunakan cleanser lembut, moisturizer pelembap, dan tutup dengan sunscreen setiap pagi.";
       recs = [
         {
-          name: "Lumina Hydrating Care Kit",
-          type: "Basic Skincare Set",
-          reason: "Rangkaian dasar untuk menjaga hidrasi dan keseimbangan pH kulit."
+          name: "Lumina Basic Skincare Kit",
+          type: "Basic Routine",
+          reason: "Rangkaian dasar untuk menjaga hidrasi dan keseimbangan kelembapan kulit.",
+          image: "/images/serum.png"
         }
       ];
     }
@@ -114,7 +122,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
           recommendations: recs
         }
       ]);
-    }, 1200);
+    }, 1000);
   };
 
   const handleSendMessage = (textToSend?: string) => {
@@ -136,9 +144,9 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
   };
 
   const quickPrompts = [
-    "Cara ngatasin jerawat meradang",
-    "Rekomendasi bekas jerawat hitam",
-    "Skin barrier lagi breakout perih"
+    "Jerawat Meradang",
+    "Flek & Bekas Hitam",
+    "Skin Barrier Perih"
   ];
 
   return (
@@ -148,44 +156,57 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={() => onOpen()}
-            className="group flex items-center gap-3 bg-[#2D4A3E] hover:bg-[#233A31] text-white px-5 py-4 rounded-full shadow-2xl transition-all duration-300 animate-pulse-glow hover:scale-105 active:scale-95 border-2 border-white/40 cursor-pointer"
+            className="group flex items-center gap-3 bg-[#132E21] hover:bg-[#1E4431] text-white px-5 py-3 rounded-full shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 border border-[#285A41]/40 cursor-pointer"
           >
-            <div className="relative">
-              <Bot className="w-6 h-6 text-white" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-[#2D4A3E]" />
+            <div className="relative w-7 h-7 rounded-full overflow-hidden border border-white/20">
+              <Image
+                src="/images/derm_assistant_logo.svg"
+                alt="DermAssistant Logo"
+                fill
+                className="object-cover"
+              />
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#E07A5F] rounded-full ring-2 ring-[#132E21]" />
             </div>
-            <span className="font-bold text-sm hidden sm:inline-block">Konsul Derm</span>
+            <span className="font-bold text-sm tracking-wide">Konsul Derm</span>
           </button>
         </div>
       )}
 
-      {/* Slide-over / Modal Chat Window */}
+      {/* Modern Slide-over / Modal Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[420px] h-[580px] max-h-[85vh] bg-white/95 backdrop-blur-xl border border-[#E6E1DA] rounded-3xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
-          {/* Chat Header */}
-          <div className="bg-[#2D4A3E] text-white px-5 py-4 flex items-center justify-between shrink-0 shadow-sm">
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[410px] h-[590px] max-h-[85vh] bg-[#FAF8F5] border border-[#E8E4DE] rounded-3xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-6">
+          
+          {/* Header */}
+          <div className="bg-[#132E21] text-white px-5 py-4 flex items-center justify-between shrink-0 shadow-md">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/20 shadow-sm shrink-0">
+                <Image
+                  src="/images/derm_assistant_logo.svg"
+                  alt="DermAssistant Logo"
+                  fill
+                  className="object-cover"
+                />
               </div>
               <div>
-                <h3 className="font-bold text-sm flex items-center gap-2">
+                <h3 className="font-bold text-sm flex items-center gap-2 text-white">
                   MySkin DermAssistant
-                  <span className="bg-emerald-500/30 text-emerald-200 text-[10px] px-2 py-0.5 rounded-full border border-emerald-400/30">
-                    Online
-                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 </h3>
-                <p className="text-[11px] text-[#D4E2D4] font-medium">
+                <p className="text-[11px] text-[#B0C4B8] font-medium">
                   Konsultasi Kulit Gen-Z
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                title="Tutup Chat"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Messages Body */}
@@ -193,59 +214,76 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex gap-3 ${
+                className={`flex gap-2.5 ${
                   msg.sender === "user" ? "justify-end" : "justify-start"
                 }`}
               >
                 {msg.sender === "ai" && (
-                  <div className="w-7 h-7 rounded-lg bg-[#2D4A3E] text-white flex items-center justify-center shrink-0 mt-1 shadow-sm">
-                    <Bot className="w-4 h-4" />
+                  <div className="relative w-7 h-7 rounded-full overflow-hidden shrink-0 mt-1 shadow-sm border border-[#132E21]/20">
+                    <Image
+                      src="/images/derm_assistant_logo.svg"
+                      alt="DermAssistant"
+                      fill
+                      className="object-cover"
+                    />
                   </div>
                 )}
 
                 <div className={`max-w-[82%] ${msg.sender === "user" ? "items-end" : "items-start"}`}>
                   <div
-                    className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
+                    className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                       msg.sender === "user"
-                        ? "bg-[#2D4A3E] text-white rounded-br-none shadow-sm"
-                        : "bg-white text-[#1A1A1A] border border-[#E6E1DA] rounded-bl-none shadow-sm"
+                        ? "bg-[#132E21] text-white rounded-tr-xs shadow-sm"
+                        : "bg-white text-[#1A2421] border border-[#E8E4DE] rounded-tl-xs shadow-sm"
                     }`}
                   >
                     <p className="whitespace-pre-line">{msg.text}</p>
 
-                    {/* Recommendations Cards inside AI response */}
+                    {/* Recommendation Cards inside AI response */}
                     {msg.recommendations && msg.recommendations.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-[#E6E1DA] space-y-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#2D4A3E] block">
-                          Formulasi Direkomendasikan:
+                      <div className="mt-3.5 pt-3 border-t border-[#E8E4DE] space-y-2">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#E07A5F] block">
+                          Rekomendasi Formulasi:
                         </span>
                         {msg.recommendations.map((rec, i) => (
                           <div
                             key={i}
-                            className="bg-[#FAF8F5] border border-[#E0DCD5] rounded-xl p-2.5 text-left"
+                            className="bg-[#FAF8F5] border border-[#E8E4DE] rounded-xl p-2.5 text-left flex gap-3 items-center hover:border-[#132E21]/30 transition-colors"
                           >
-                            <div className="font-bold text-[#1A1A1A] text-xs">
-                              {rec.name}
-                            </div>
-                            <div className="text-[10px] text-[#2D4A3E] font-semibold">
-                              {rec.type}
-                            </div>
-                            <div className="text-[10px] text-[#5A5A5A] mt-1">
-                              {rec.reason}
+                            {rec.image && (
+                              <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-[#E8E4DE] bg-white">
+                                <Image
+                                  src={rec.image}
+                                  alt={rec.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0 space-y-0.5">
+                              <div className="font-bold text-[#132E21] text-xs truncate">
+                                {rec.name}
+                              </div>
+                              <div className="text-[10px] text-[#E07A5F] font-semibold">
+                                {rec.type}
+                              </div>
+                              <div className="text-[11px] text-[#4A5D53] line-clamp-2">
+                                {rec.reason}
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                  <span className="text-[9px] text-[#8A8A8A] block mt-1 px-1">
+                  <span className="text-[9px] text-[#8A9590] block mt-1 px-1">
                     {msg.timestamp}
                   </span>
                 </div>
 
                 {msg.sender === "user" && (
-                  <div className="w-7 h-7 rounded-lg bg-[#E8EFE9] text-[#2D4A3E] flex items-center justify-center shrink-0 mt-1">
-                    <User className="w-4 h-4" />
+                  <div className="w-7 h-7 rounded-full bg-[#E2EBE6] text-[#132E21] flex items-center justify-center shrink-0 mt-1">
+                    <User className="w-3.5 h-3.5" />
                   </div>
                 )}
               </div>
@@ -253,15 +291,15 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
 
             {/* AI Typing Indicator */}
             {isTyping && (
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-[#2D4A3E] text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <Bot className="w-4 h-4" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-[#132E21] text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Sparkles className="w-3.5 h-3.5 text-[#E07A5F]" />
                 </div>
-                <div className="bg-white border border-[#E6E1DA] p-3 rounded-2xl rounded-bl-none shadow-sm flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-[#2D4A3E] rounded-full animate-bounce" />
-                  <span className="w-1.5 h-1.5 bg-[#2D4A3E] rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <span className="w-1.5 h-1.5 bg-[#2D4A3E] rounded-full animate-bounce [animation-delay:0.4s]" />
-                  <span className="text-[10px] text-[#5A5A5A] ml-1 font-medium">Memproses analisis...</span>
+                <div className="bg-white border border-[#E8E4DE] px-4 py-3 rounded-2xl rounded-tl-xs shadow-sm flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#E07A5F] rounded-full animate-bounce" />
+                  <span className="w-1.5 h-1.5 bg-[#E07A5F] rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <span className="w-1.5 h-1.5 bg-[#E07A5F] rounded-full animate-bounce [animation-delay:0.4s]" />
+                  <span className="text-[11px] text-[#4A5D53] font-medium ml-1">Mencocokkan formulasi...</span>
                 </div>
               </div>
             )}
@@ -269,14 +307,14 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
           </div>
 
           {/* Quick Prompt Chips */}
-          <div className="px-3 py-2 bg-white border-t border-[#E6E1DA] flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="px-3.5 py-2.5 bg-white border-t border-[#E8E4DE] flex items-center gap-2 overflow-x-auto no-scrollbar">
             {quickPrompts.map((prompt, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSendMessage(prompt)}
-                className="bg-[#FAF8F5] hover:bg-[#E8EFE9] border border-[#E0DCD5] text-[#2D4A3E] px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap transition-colors"
+                className="bg-[#FAF8F5] hover:bg-[#E2EBE6] border border-[#E8E4DE] text-[#132E21] px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer"
               >
-                + {prompt}
+                {prompt}
               </button>
             ))}
           </div>
@@ -287,23 +325,24 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
               e.preventDefault();
               handleSendMessage();
             }}
-            className="p-3 bg-white border-t border-[#E6E1DA] flex items-center gap-2"
+            className="p-3.5 bg-white border-t border-[#E8E4DE] flex items-center gap-2.5"
           >
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ketik keluhan kulit lo di sini..."
-              className="flex-1 bg-[#FAF8F5] border border-[#E0DCD5] focus:border-[#2D4A3E] focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-[#1A1A1A] placeholder-[#8A8A8A] outline-none transition-colors"
+              placeholder="Tulis keluhan jerawat, flek, atau breakout..."
+              className="flex-1 bg-[#FAF8F5] border border-[#E8E4DE] focus:border-[#132E21] focus:bg-white rounded-2xl px-4 py-3 text-xs sm:text-sm text-[#1A2421] placeholder-[#8A9590] outline-none transition-all"
             />
             <button
               type="submit"
               disabled={!input.trim() || isTyping}
-              className="w-9 h-9 rounded-xl bg-[#2D4A3E] hover:bg-[#233A31] disabled:bg-[#CCCCCC] text-white flex items-center justify-center transition-colors shrink-0 shadow-sm"
+              className="w-10 h-10 rounded-2xl bg-[#132E21] hover:bg-[#1E4431] disabled:bg-[#D5DCD8] text-white flex items-center justify-center transition-all shrink-0 shadow-sm active:scale-95 cursor-pointer"
             >
               <Send className="w-4 h-4" />
             </button>
           </form>
+
         </div>
       )}
     </>

@@ -1,0 +1,25 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle Badge -->
+  <circle cx="100" cy="100" r="96" fill="#132E21" stroke="#285A41" stroke-width="4"/>
+  
+  <!-- Outer Subtle Ring -->
+  <circle cx="100" cy="100" r="82" fill="none" stroke="#285A41" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"/>
+
+  <!-- Medical Cross + Botanical Leaf Hybrid Motif -->
+  <!-- Vertical Bar of Cross -->
+  <rect x="91" y="48" width="18" height="104" rx="9" fill="#E07A5F"/>
+  <!-- Horizontal Bar of Cross -->
+  <rect x="48" y="91" width="104" height="18" rx="9" fill="#E07A5F"/>
+
+  <!-- Botanical Leaf Overlay -->
+  <path d="M100 48C130 65 145 95 145 130C110 130 80 115 65 85C65 65 80 50 100 48Z" fill="#285A41" opacity="0.4"/>
+  <path d="M100 48C70 65 55 95 55 130C90 130 120 115 135 85C135 65 120 50 100 48Z" fill="#E2EBE6" opacity="0.2"/>
+
+  <!-- Center Sparkle / Dermatology Star Motif -->
+  <path d="M100 70L104 94L128 98L104 102L100 126L96 102L72 98L96 94L100 70Z" fill="#FAF8F5"/>
+  <path d="M100 82L102 96L116 98L102 100L100 114L98 100L84 98L98 96L100 82Z" fill="#E07A5F"/>
+
+  <!-- Small Glowing Dot Accent -->
+  <circle cx="134" cy="66" r="6" fill="#E07A5F"/>
+  <circle cx="66" cy="134" r="4" fill="#E2EBE6"/>
+</svg>
