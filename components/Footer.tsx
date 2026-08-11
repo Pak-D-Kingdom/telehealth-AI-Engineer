@@ -20,7 +20,7 @@ export default function Footer() {
               />
             </div>
             <p className="text-sm text-[#B0C4B8] leading-relaxed max-w-sm">
-              Platform telehealth & rekomendasi skincare berbasis AI khusus Gen-Z Indonesia. Mengatasi jerawat, dark spot, dan breakout secara presisi.
+              Platform telehealth & rekomendasi skincare berbasis AI khusus Gen-Z Indonesia. Mengatasi jerawat, dark spot, dan breakout secara tepat & efektif.
             </p>
           </div>
 

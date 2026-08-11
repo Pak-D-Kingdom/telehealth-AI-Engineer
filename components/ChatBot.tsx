@@ -176,7 +176,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                   </span>
                 </h3>
                 <p className="text-[11px] text-[#D4E2D4] font-medium">
-                  Konsultasi Kulit Gen-Z Presisi
+                  Konsultasi Kulit Gen-Z
                 </p>
               </div>
             </div>

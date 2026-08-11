@@ -1,89 +1,118 @@
 "use client";
 
 import React from "react";
-import { MessageSquareCode, Cpu, Sparkles, ArrowRight } from "lucide-react";
+import Image from "next/image";
+import { CheckCircle2 } from "lucide-react";
 
 interface HowItWorksProps {
   onOpenChat: (initialQuery?: string) => void;
 }
 
 export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
-  const steps = [
-    {
-      step: "01",
-      icon: MessageSquareCode,
-      title: "Curhat Keluhan Wajah",
-      description: "Buka AI Chatbot dan ceritakan masalah kulit lo saat ini. Sebutkan tipe kulit, jerawat, flek, atau riwayat produk yang pernah dipakai."
-    },
-    {
-      step: "02",
-      icon: Cpu,
-      title: "Analisis Formulasi AI",
-      description: "AI memproses data keluhan lo dan memetakan bahan aktif (seperti Niacinamide, Salicylic Acid, Retinol) yang aman dan paling efektif."
-    },
-    {
-      step: "03",
-      icon: Sparkles,
-      title: "Dapatkan Rekomendasi",
-      description: "Kamu akan mendapatkan urutan skincare (Cleanser, Serum, Moisturizer, Sunscreen) yang personalized tanpa komplikasi."
-    }
+  const checklist = [
+    "Formulasi pas sesuai kondisi riil muka lo",
+    "Stop buang duit buat skincare yang bikin breakout",
+    "Bahan aktif teruji (Salicylic, Niacinamide, Ceramide)",
+    "Dosis aman khusus biar skin barrier gak perih",
+    "Panduan pemakaian harian yang super simpel"
   ];
 
   return (
-    <section id="cara-kerja" className="py-20 bg-[#FAF8F5]">
+    <section id="cara-kerja" className="py-24 bg-[#FBF8F5] text-[#1A2421] border-t border-[#EAE4DC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#2D4A3E] bg-[#E8EFE9] px-3.5 py-1.5 rounded-full inline-block mb-4">
-            Alur Mudah
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#1A1A1A] tracking-tight">
-            Cara Kerja AI Telehealth MySkin
-          </h2>
-          <p className="mt-4 text-base sm:text-lg text-[#5A5A5A]">
-            Tiga langkah praktis untuk mengakhiri trial-and-error skincare yang bikin boros dan bikin breakout.
-          </p>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+          
+          {/* Left Column (Span 5) */}
+          <div className="lg:col-span-5 space-y-10">
+            {/* Top Left Image Container - Clean Without Outer Background Color */}
+            <div className="relative w-full aspect-[4/3] rounded-[2.5rem] overflow-hidden shadow-sm border border-[#E8DFC0]/40">
+              <Image
+                src="/images/cream.png"
+                alt="Perawatan Skincare"
+                fill
+                className="object-cover hover:scale-105 transition-transform duration-700"
+              />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-          {steps.map((item, index) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={index}
-                className="bg-white border border-[#E6E1DA] rounded-3xl p-8 shadow-sm hover:shadow-lg transition-all relative flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="text-4xl font-black text-[#E0DCD5] tracking-tighter">
-                      {item.step}
-                    </span>
-                    <div className="w-12 h-12 rounded-2xl bg-[#E8EFE9] text-[#2D4A3E] flex items-center justify-center">
-                      <Icon className="w-6 h-6" />
+            {/* Checklist Section - Gen-Z Oriented */}
+            <div className="space-y-5 pl-1">
+              <h3 className="text-2xl font-bold text-[#132E21] tracking-tight">
+                Skincare-an Gak Pake Drama
+              </h3>
+
+              <ul className="space-y-3.5">
+                {checklist.map((item, idx) => (
+                  <li key={idx} className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full bg-[#E07A5F] text-white flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
                     </div>
-                  </div>
+                    <span className="text-sm font-semibold text-[#4A5550]">
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
 
-                  <h3 className="text-xl font-bold text-[#1A1A1A] mb-3">
-                    {item.title}
-                  </h3>
+          {/* Right Column (Span 7) */}
+          <div className="lg:col-span-7 space-y-12">
+            {/* Top Right Headline - Gen Z Oriented */}
+            <div className="space-y-3">
+              <span className="text-xs font-extrabold tracking-[0.2em] text-[#E07A5F] uppercase">
+                Dermatologi Gen-Z
+              </span>
 
-                  <p className="text-sm text-[#5A5A5A] leading-relaxed mb-6">
-                    {item.description}
-                  </p>
-                </div>
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#132E21] tracking-tight leading-[1.15]">
+                <span className="text-[#E07A5F]">Glow up</span> tanpa trial-error, jagain skin barrier muka lo.
+              </h2>
+            </div>
+
+            {/* Middle 2 Vertical Editorial Cards */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Card 1: Model Portrait */}
+              <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-[#EAE3D9] border border-[#E2D9CC] shadow-sm">
+                <Image
+                  src="/images/issue_acne.png"
+                  alt="Model Kulit Sehat"
+                  fill
+                  className="object-cover hover:scale-105 transition-transform duration-700"
+                />
               </div>
-            );
-          })}
-        </div>
 
-        {/* CTA Box */}
-        <div className="mt-12 text-center">
-          <button
-            onClick={() => onOpenChat("Gue mau mulai sesi konsultasi AI skincare sekarang.")}
-            className="inline-flex items-center gap-3 bg-[#2D4A3E] hover:bg-[#233A31] text-white px-8 py-4 rounded-full font-bold text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
-          >
-            <span>Coba Chatbot AI Sekarang</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+              {/* Card 2: Skincare Product Texture */}
+              <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-[#EAE3D9] border border-[#E2D9CC] shadow-sm">
+                <Image
+                  src="/images/serum.png"
+                  alt="Bahan Aktif Skincare"
+                  fill
+                  className="object-cover hover:scale-105 transition-transform duration-700"
+                />
+              </div>
+            </div>
+
+            {/* Bottom Story & CTA - Gen Z Oriented */}
+            <div className="space-y-6 max-w-xl">
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-[#132E21] tracking-tight leading-snug">
+                Stop kemakan racun skincare FYP yang gak cocok di muka
+              </h3>
+
+              <p className="text-sm sm:text-base text-[#4A5550] leading-relaxed">
+                DermAssistant bakal bedah masalah kulit lo secara detail dan racikin kombinasi bahan aktif yang pas. Gak ada lagi cerita dompet menipis cuma buat coba-coba produk yang malah bikin muka makin perih dan breakout.
+              </p>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => onOpenChat("Gue mau konsul keluhan kulit muka sekarang.")}
+                  className="inline-flex items-center justify-center bg-[#E07A5F] hover:bg-[#C9664B] text-white px-9 py-4 rounded-full font-bold text-sm sm:text-base transition-all shadow-md hover:shadow-lg active:scale-95 uppercase tracking-wider"
+                >
+                  Konsul DermAssistant Sekarang
+                </button>
+              </div>
+            </div>
+
+          </div>
+
         </div>
       </div>
     </section>
