@@ -6,6 +6,8 @@ import Hero from "@/components/Hero";
 import SkinIssues from "@/components/SkinIssues";
 import HowItWorks from "@/components/HowItWorks";
 import ProductsShowcase from "@/components/ProductsShowcase";
+import Dermatologists from "@/components/Dermatologists";
+import TrustBar from "@/components/TrustBar";
 import Footer from "@/components/Footer";
 import ChatBot from "@/components/ChatBot";
 
@@ -30,9 +32,11 @@ export default function Home() {
         <Navbar onOpenChat={handleOpenChat} />
         <main>
           <Hero onOpenChat={handleOpenChat} />
+          <TrustBar />
           <SkinIssues onOpenChat={handleOpenChat} />
           <HowItWorks onOpenChat={handleOpenChat} />
           <ProductsShowcase onOpenChat={handleOpenChat} />
+          <Dermatologists onOpenChat={handleOpenChat} />
         </main>
       </div>
       <Footer />
