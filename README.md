@@ -1,15 +1,23 @@
 # Telehealth Backend
 
-Backend API untuk aplikasi telehealth, dibangun menggunakan Express.js dan dijalankan dengan Bun.
+Backend API untuk aplikasi telehealth menggunakan Express.js, Bun, PostgreSQL, dan Prisma ORM.
+
+## Teknologi
+
+- Bun `1.3.12`
+- Express.js `5`
+- TypeScript
+- PostgreSQL `17` melalui Docker
+- Prisma ORM `7`
 
 ## Prasyarat
 
-Pastikan Bun sudah terpasang di komputer. Proyek ini menggunakan Bun versi `1.3.12`.
-
-Periksa versi Bun dengan perintah berikut:
+Pastikan Bun dan Docker sudah tersedia:
 
 ```bash
 bun --version
+docker --version
+docker compose version
 ```
 
 ## Instalasi
@@ -20,7 +28,7 @@ bun --version
    cd telehealth-backend
    ```
 
-2. Instal seluruh dependency menggunakan Bun:
+2. Instal dependency menggunakan Bun:
 
    ```bash
    bun install
@@ -32,63 +40,98 @@ bun --version
    cp .env.example .env
    ```
 
-4. Sesuaikan nilai di dalam `.env` jika diperlukan:
+4. Jalankan PostgreSQL di Docker:
 
-   ```env
-   NODE_ENV=development
-   PORT=3000
+   ```bash
+   bun run db:up
    ```
 
-## Menjalankan Aplikasi
+5. Validasi schema dan generate Prisma Client:
 
-Jalankan server dalam mode development dengan pemantauan perubahan file:
+   ```bash
+   bun run db:validate
+   bun run db:generate
+   ```
 
-```bash
-bun run dev
-```
+6. Jalankan backend:
 
-Jalankan server tanpa mode pemantauan:
+   ```bash
+   bun run dev
+   ```
 
-```bash
-bun run start
-```
+Backend tersedia di `http://localhost:4000`.
 
-Server secara default tersedia di:
+## Memeriksa Koneksi
 
-```text
-http://localhost:3000
-```
-
-## Memeriksa Server
-
-Buka endpoint berikut di browser atau gunakan `curl`:
+Endpoint health juga memeriksa koneksi PostgreSQL:
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:4000/health
 ```
 
-Respons yang diharapkan:
+Respons ketika API dan database siap:
 
 ```json
 {
   "status": "ok",
-  "environment": "development"
+  "environment": "development",
+  "database": "connected"
 }
 ```
 
-## Environment Variable
+## Konfigurasi Environment
 
-| Nama | Nilai bawaan | Keterangan |
+| Nama | Nilai development | Keterangan |
 | --- | --- | --- |
-| `NODE_ENV` | `development` | Environment tempat aplikasi berjalan |
-| `PORT` | `3000` | Port yang digunakan server HTTP |
+| `NODE_ENV` | `development` | Environment aplikasi |
+| `PORT` | `4000` | Port backend API |
+| `POSTGRES_DB` | `telehealth` | Nama database PostgreSQL |
+| `POSTGRES_USER` | `telehealth` | Pengguna PostgreSQL |
+| `POSTGRES_PASSWORD` | `telehealth_dev_password` | Password lokal PostgreSQL |
+| `POSTGRES_PORT` | `5434` | Port PostgreSQL pada host |
+| `DATABASE_URL` | `postgresql://...` | URL koneksi yang digunakan Prisma |
+
+Port database menggunakan `5434` agar tidak bentrok dengan instalasi PostgreSQL lokal yang biasanya memakai `5432`. Di dalam container, PostgreSQL tetap menggunakan port `5432`.
+
+> Kredensial contoh hanya untuk development lokal. Gunakan secret yang kuat dan jangan commit `.env` untuk staging atau production.
+
+## Prisma
+
+Schema Prisma berada di `prisma/schema.prisma`. Schema awal belum berisi model bisnis agar struktur tabel dapat dirancang sesuai kebutuhan frontend sebelum migration pertama dibuat.
+
+Setelah menambahkan atau mengubah model, buat migration dengan:
+
+```bash
+bun run db:migrate -- --name nama_migration
+```
+
+Untuk menjalankan migration yang sudah ada pada staging atau production:
+
+```bash
+bun run db:deploy
+```
+
+Buka Prisma Studio untuk melihat data:
+
+```bash
+bun run db:studio
+```
 
 ## Perintah yang Tersedia
 
 | Perintah | Keterangan |
 | --- | --- |
-| `bun install` | Menginstal dependency berdasarkan `bun.lock` |
-| `bun run dev` | Menjalankan server dalam mode development |
+| `bun install` | Menginstal dependency dan generate Prisma Client |
+| `bun run dev` | Menjalankan server dengan watch mode |
 | `bun run start` | Menjalankan server secara normal |
+| `bun run typecheck` | Memeriksa TypeScript tanpa menghasilkan file build |
+| `bun run db:up` | Menyalakan PostgreSQL dan menunggu sampai sehat |
+| `bun run db:down` | Menghentikan container PostgreSQL |
+| `bun run db:logs` | Melihat log PostgreSQL |
+| `bun run db:validate` | Memvalidasi schema Prisma |
+| `bun run db:generate` | Menghasilkan Prisma Client |
+| `bun run db:migrate -- --name ...` | Membuat dan menjalankan migration development |
+| `bun run db:deploy` | Menjalankan migration untuk deployment |
+| `bun run db:studio` | Membuka Prisma Studio |
 
-> Proyek ini menggunakan Bun sebagai package manager. Jangan menjalankan `npm install` agar tidak menghasilkan `package-lock.json` atau lockfile yang berbeda.
+> Proyek ini menggunakan Bun sebagai package manager. Jangan menjalankan `npm install` agar tidak membuat lockfile lain.
