@@ -12,53 +12,53 @@ export default function Dermatologists({ onOpenChat }: DermatologistsProps) {
   const [activeFilter, setActiveFilter] = useState<string>("all");
 
   const categories = [
-    { id: "all", label: "Semua Spesialis" },
-    { id: "acne", label: "Jerawat & Inflamasi" },
-    { id: "darkspot", label: "Flek Hitam & PIH" },
-    { id: "barrier", label: "Skin Barrier & Perih" },
-    { id: "sebum", label: "Pori & Sebum Control" }
+    { id: "all", label: "Semua Dokter Spesialis" },
+    { id: "diabetes2", label: "Diabetes Tipe 2 & Gula Tinggi" },
+    { id: "ulkus", label: "Luka Diabetes (Ulkus)" },
+    { id: "insulin", label: "Sensitivitas Insulin" },
+    { id: "gestational", label: "Gestational Diabetes" }
   ];
 
   const doctors = [
     {
       id: "doc1",
-      name: "dr. Arisandi Putri, Sp.D.V.E",
-      specialty: "Spesialis Acne & Hiperpigmentasi",
-      experience: "8+ Tahun Pengalaman",
+      name: "dr. Hendra Wijaya, Sp.PD-KEMD",
+      specialty: "Spesialis Endokrinologi & Diabetes Tipe 2",
+      experience: "12+ Tahun Pengalaman",
       str: "STR & SIP Kemenkes RI",
       image: "/images/doctor_1.png",
-      categoryIds: ["acne", "darkspot"],
-      query: "Gue mau konsul langsung soal jerawat meradang & flek hitam sama dr. Arisandi, Sp.D.V.E"
+      categoryIds: ["diabetes2", "insulin"],
+      query: "Gue mau konsul langsung penanganan gula darah tinggi & diabetes tipe 2 sama dr. Hendra, Sp.PD-KEMD"
     },
     {
       id: "doc2",
-      name: "dr. Rayhan Pratama, Sp.D.V.E",
-      specialty: "Spesialis Skin Barrier & Molekuler",
+      name: "dr. Siti Rahma, Sp.PD",
+      specialty: "Spesialis Kontrol Gula Darah & Nutrisi",
       experience: "10+ Tahun Pengalaman",
       str: "STR & SIP Kemenkes RI",
       image: "/images/doctor_2.png",
-      categoryIds: ["barrier", "acne"],
-      query: "Gue mau konsul penanganan skin barrier rusak sama dr. Rayhan, Sp.D.V.E"
+      categoryIds: ["diabetes2", "gestational"],
+      query: "Gue mau konsul rincian nutrisi & kontrol gula darah harian sama dr. Siti Rahma, Sp.PD"
     },
     {
       id: "doc3",
-      name: "dr. Clarissa Wijaya, Sp.D.V.E",
-      specialty: "Spesialis Dermatologi Estetika",
-      experience: "7+ Tahun Pengalaman",
+      name: "dr. Andreas Pratama, Sp.PD-KEMD",
+      specialty: "Spesialis Luka Diabetes (Ulkus Kakak)",
+      experience: "14+ Tahun Pengalaman",
       str: "STR & SIP Kemenkes RI",
       image: "/images/doctor_3.png",
-      categoryIds: ["darkspot", "barrier"],
-      query: "Gue mau konsul racikan pencerah bekas jerawat sama dr. Clarissa, Sp.D.V.E"
+      categoryIds: ["ulkus", "diabetes2"],
+      query: "Gue mau konsul perawatan luka basah diabetes (ulkus) sama dr. Andreas, Sp.PD-KEMD"
     },
     {
       id: "doc4",
-      name: "dr. Kevin Tanaka, Sp.D.V.E",
-      specialty: "Spesialis Pori & Sebum Control",
+      name: "dr. Maya Indriani, Sp.PD",
+      specialty: "Spesialis Gestational Diabetes & HbA1c",
       experience: "9+ Tahun Pengalaman",
       str: "STR & SIP Kemenkes RI",
       image: "/images/doctor_4.png",
-      categoryIds: ["sebum", "acne"],
-      query: "Gue mau konsul kontrol minyak berlebih & pori-pori tersumbat sama dr. Kevin, Sp.D.V.E"
+      categoryIds: ["gestational", "insulin"],
+      query: "Gue mau konsul skrining HbA1c & gestational diabetes sama dr. Maya Indriani, Sp.PD"
     }
   ];
 
@@ -74,22 +74,22 @@ export default function Dermatologists({ onOpenChat }: DermatologistsProps) {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6 border-b border-[#EAE4DC] pb-10">
           <div className="max-w-2xl space-y-3">
             <span className="text-xs font-extrabold text-[#E07A5F] uppercase tracking-widest">
-              Tim Dokter Spesialis Kulit
+              Tim Dokter Spesialis Terdaftar
             </span>
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-[#132E21] tracking-tight leading-tight">
-              Didampingi Dokter Dermatologi Terverifikasi
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-[#0D5C46] tracking-tight leading-tight">
+              Tim Dokter Spesialis Penyakit Dalam (Sp.PD)
             </h2>
           </div>
           <p className="text-sm sm:text-base text-[#4A5D53] max-w-md leading-relaxed">
-            Setiap formulasi dan analisis kondisi kulit diawasi langsung oleh tim dokter spesialis kulit (Sp.D.V.E) terdaftar resmi.
+            Setiap rekomendasi obat dan konsultasi diabetes diawasi langsung oleh Dokter Spesialis Penyakit Dalam & Endokrinologi terdaftar resmi.
           </p>
         </div>
 
         {/* Interactive Filter Menu Pills */}
         <div className="mb-12">
-          <div className="flex items-center gap-2 mb-3 text-xs font-extrabold text-[#132E21] uppercase tracking-wider">
+          <div className="flex items-center gap-2 mb-3 text-xs font-extrabold text-[#0D5C46] uppercase tracking-wider">
             <Filter className="w-3.5 h-3.5 text-[#E07A5F]" />
-            <span>Pilih Masalah Kulit Muka Anda:</span>
+            <span>Pilih Bidang Konsultasi Dokter:</span>
           </div>
           <div className="flex items-center gap-2.5 overflow-x-auto pb-2 no-scrollbar">
             {categories.map((cat) => {
@@ -102,14 +102,14 @@ export default function Dermatologists({ onOpenChat }: DermatologistsProps) {
                   onClick={() => setActiveFilter(cat.id)}
                   className={`px-5 py-3 rounded-full text-xs font-extrabold whitespace-nowrap transition-all duration-300 border cursor-pointer flex items-center gap-2 ${
                     isActive
-                      ? "bg-[#132E21] text-white border-[#132E21] shadow-md scale-105"
-                      : "bg-white text-[#4A5D53] border-[#E8E4DE] hover:border-[#132E21]/40 hover:text-[#132E21]"
+                      ? "bg-[#0D5C46] text-white border-[#0D5C46] shadow-md scale-105"
+                      : "bg-white text-[#4A5D53] border-[#E8E4DE] hover:border-[#0D5C46]/40 hover:text-[#0D5C46]"
                   }`}
                 >
                   <span>{cat.label}</span>
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      isActive ? "bg-[#E07A5F] text-white" : "bg-[#FAF8F5] text-[#285A41]"
+                      isActive ? "bg-[#E07A5F] text-white" : "bg-[#FAF8F5] text-[#0D5C46]"
                     }`}
                   >
                     {count}
@@ -143,7 +143,7 @@ export default function Dermatologists({ onOpenChat }: DermatologistsProps) {
                   <h4 className="text-sm font-extrabold text-[#E07A5F] leading-snug">
                     {doc.specialty}
                   </h4>
-                  <h3 className="text-lg font-bold text-[#132E21] tracking-tight leading-snug">
+                  <h3 className="text-lg font-bold text-[#0D5C46] tracking-tight leading-snug">
                     {doc.name}
                   </h3>
                 </div>
@@ -151,11 +151,11 @@ export default function Dermatologists({ onOpenChat }: DermatologistsProps) {
                 {/* Experience & Credentials */}
                 <div className="flex flex-col gap-1.5 text-[11px] font-medium text-[#4A5D53] pt-1 border-t border-[#F0ECE6]">
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#285A41]" />
+                    <Calendar className="w-3.5 h-3.5 text-[#0D5C46]" />
                     <span>{doc.experience}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#285A41]" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#0D5C46]" />
                     <span>{doc.str}</span>
                   </div>
                 </div>
@@ -165,7 +165,7 @@ export default function Dermatologists({ onOpenChat }: DermatologistsProps) {
               <div className="pt-2">
                 <button
                   onClick={() => onOpenChat(doc.query)}
-                  className="w-full flex items-center justify-between bg-[#132E21] hover:bg-[#1E4431] text-white text-xs font-bold py-3 px-4 rounded-xl transition-all shadow-sm active:scale-95 group/btn cursor-pointer"
+                  className="w-full flex items-center justify-between bg-[#0D5C46] hover:bg-[#1A8B6B] text-white text-xs font-bold py-3 px-4 rounded-xl transition-all shadow-sm active:scale-95 group/btn cursor-pointer"
                 >
                   <span>Konsultasi Dokter Ini</span>
                   <ArrowRight className="w-4 h-4 text-[#E07A5F] group-hover/btn:translate-x-1 transition-transform" />

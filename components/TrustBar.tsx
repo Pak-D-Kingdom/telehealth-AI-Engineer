@@ -1,25 +1,25 @@
 "use client";
 
 import React from "react";
-import { Award, Truck, Stethoscope, CircleDollarSign } from "lucide-react";
+import { PackageCheck, Stethoscope, Zap, CircleDollarSign } from "lucide-react";
 
 export default function TrustBar() {
   const items = [
     {
-      icon: Award,
-      text: "Garansi Formulasi MySkin"
-    },
-    {
-      icon: Truck,
-      text: "Bebas Ongkir & Pengiriman Cepat"
+      icon: PackageCheck,
+      text: "OBAT & ALAT KIRIM KE RUMAH"
     },
     {
       icon: Stethoscope,
-      text: "Pendampingan Dokter & Derm Care"
+      text: "DOKTER SPESIALIS SP.PD RESMI"
+    },
+    {
+      icon: Zap,
+      text: "100% KONSULTASI ONLINE"
     },
     {
       icon: CircleDollarSign,
-      text: "Tanpa Biaya Tersembunyi"
+      text: "HARGA TRANSPARAN & BIASA"
     }
   ];
 
@@ -32,12 +32,12 @@ export default function TrustBar() {
             return (
               <div
                 key={idx}
-                className="py-7 px-6 sm:px-8 flex items-center gap-4 border-b sm:border-b-0 sm:border-r border-[#E8E4DE] last:border-r-0 last:border-b-0"
+                className="py-6 px-6 sm:px-8 flex items-center gap-3.5 border-b sm:border-b-0 sm:border-r border-[#E8E4DE] last:border-r-0 last:border-b-0"
               >
-                <div className="shrink-0 text-[#132E21]">
-                  <Icon className="w-7 h-7 stroke-[1.5]" />
+                <div className="shrink-0 text-[#0A3020]">
+                  <Icon className="w-5 h-5 stroke-[1.8]" />
                 </div>
-                <span className="font-bold text-sm text-[#132E21] leading-snug">
+                <span className="font-extrabold text-xs tracking-wider text-[#0A3020] uppercase">
                   {item.text}
                 </span>
               </div>

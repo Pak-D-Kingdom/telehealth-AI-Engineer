@@ -1,0 +1,19 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Shield/Badge -->
+  <circle cx="100" cy="100" r="96" fill="#0D5C46" stroke="#1A8B6B" stroke-width="4"/>
+  <circle cx="100" cy="100" r="82" fill="none" stroke="#1A8B6B" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5"/>
+
+  <!-- Blood Drop + Heart + Cross Motif -->
+  <path d="M100 42C100 42 142 88 142 120C142 143.192 123.192 162 100 162C76.8081 162 58 143.192 58 120C58 88 100 42 100 42Z" fill="#E07A5F"/>
+  
+  <!-- Inner White Medical Cross -->
+  <rect x="92" y="98" width="16" height="40" rx="4" fill="white"/>
+  <rect x="80" y="110" width="40" height="16" rx="4" fill="white"/>
+
+  <!-- Pulse Line Overlay -->
+  <path d="M68 124H82L88 112L96 136L104 118L112 128L120 124H132" stroke="#0D5C46" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Glowing Sparkle Accent -->
+  <circle cx="138" cy="62" r="6" fill="#F4A261"/>
+  <circle cx="62" cy="138" r="4" fill="#E2EBE6"/>
+</svg>

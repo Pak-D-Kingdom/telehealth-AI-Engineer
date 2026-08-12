@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-red-hat), "Red Hat Text", system-ui, -apple-system, sans-serif;
+}
+
 :root {
   --background: #FAF8F5;
   --foreground: #1A1A1A;
-  --font-red-hat-text: var(--font-red-hat), sans-serif;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-red-hat-text);
+  font-family: var(--font-sans);
 }
 
 @keyframes pulseGlow {
@@ -24,4 +27,3 @@ body {
 .animate-pulse-glow {
   animation: pulseGlow 3s infinite ease-in-out;
 }
-

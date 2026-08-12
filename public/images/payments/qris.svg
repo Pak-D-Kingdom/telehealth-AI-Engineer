@@ -1,0 +1,7 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="40" rx="8" fill="#EE2737"/>
+  <path d="M16 10H32V14H21V18H30V22H21V30H16V10Z" fill="white"/>
+  <text x="36" y="27" font-family="Arial, sans-serif" font-weight="900" font-size="20" fill="white" letter-spacing="1">QRIS</text>
+  <path d="M92 12H104V28H92V12Z" stroke="white" stroke-width="2"/>
+  <circle cx="98" cy="20" r="3" fill="white"/>
+</svg>

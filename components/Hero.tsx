@@ -11,30 +11,34 @@ interface HeroProps {
 export default function Hero({ onOpenChat }: HeroProps) {
   const categoryCards = [
     {
-      title: "Jerawat & Acne",
-      image: "/images/card_acne.png",
-      query: "Kulit gue lagi jerawatan dan meradang, rekomendasi skincare apa yang cocok?"
+      title: "Gula Darah Tinggi",
+      bg: "bg-[#EAF5EF]",
+      image: "/images/card_sugar.png",
+      query: "Gue mau konsultasi keluhan kadar gula darah puasa tinggi dan sering lemas."
     },
     {
-      title: "Flek Hitam & Dark Spot",
-      image: "/images/card_darkspot.png",
-      query: "Gimana cara menyamarkan flek hitam dan bekas jerawat di wajah secara cepat?"
+      title: "Skrining HbA1c",
+      bg: "bg-[#F3EFEA]",
+      image: "/images/card_hba1c.png",
+      query: "Gimana cara kontrol kadar HbA1c dan sensitivitas insulin secara efektif?"
     },
     {
-      title: "Breakout & Barrier",
-      image: "/images/card_barrier.png",
-      query: "Muka gue lagi breakout parah dan perih, gimana cara benerin skin barrier?"
+      title: "Dokter Spesialis Sp.PD",
+      bg: "bg-[#F5F2EA]",
+      image: "/images/card_doctor.png",
+      query: "Gue mau konsul langsung dengan Dokter Spesialis Penyakit Dalam (Sp.PD)."
     },
     {
-      title: "Kulit Kusam & Sebum",
-      image: "/images/card_kusam.png",
-      query: "Kulit muka gue kusam dan gampang berminyak, butuh saran produk yang pas."
+      title: "Luka & Pola Makan",
+      bg: "bg-[#FCEFEF]",
+      image: "/images/card_diet_ulcer.png",
+      query: "Ada rekomendasi gel perawatan luka diabetes dan saran pola makan low-GI?"
     }
   ];
 
   return (
-    <section className="relative bg-[#132E21] text-white pt-28 pb-24 lg:pt-36 lg:pb-36 overflow-hidden">
-      {/* Background Dot Pattern from Magic UI (Static Subtle Texture) */}
+    <section className="relative bg-gradient-to-b from-[#0A3020] via-[#0E422C] to-[#124D33] text-white pt-32 pb-20 lg:pt-40 lg:pb-28 overflow-hidden">
+      {/* Static Subtle Dot Pattern Texture */}
       <DotPattern
         width={24}
         height={24}
@@ -42,43 +46,43 @@ export default function Hero({ onOpenChat }: HeroProps) {
         cy={2}
         cr={1.8}
         glow={false}
-        className="[mask-image:radial-gradient(800px_circle_at_center,white,transparent)] opacity-35 text-[#81C7A2]"
+        className="[mask-image:radial-gradient(800px_circle_at_center,white,transparent)] opacity-25 text-[#88D39E]"
       />
 
-      {/* Background Giant Text Watermark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-10">
-        <span className="text-[18vw] font-black tracking-tighter text-white whitespace-nowrap">
-          MYSKIN
+      {/* Background Text Watermark - Subtle & Elegant */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-5">
+        <span className="text-[10vw] sm:text-[11vw] font-black tracking-widest text-white whitespace-nowrap">
+          GLUCOCARE
         </span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        {/* Top Centered Header Content */}
-        <div className="text-center max-w-4xl mx-auto space-y-6">
-          <p className="text-xs sm:text-sm font-semibold tracking-wide text-[#A3D9C0]">
-            Dipakai <span className="font-bold text-white">50,000+</span> Gen-Z Indonesia
+        
+        {/* Centered Top Content with Clean Indonesian Copywriting */}
+        <div className="text-center max-w-3xl mx-auto space-y-5">
+          <p className="text-xs sm:text-sm font-semibold tracking-wide text-white/80">
+            Dipercaya <span className="font-bold text-white">500.000+</span> Pasien Diabetes Indonesia
           </p>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.15]">
-            Perawatan Kulit,{" "}
-            <span className="text-[#81C7A2] font-semibold italic">dirancang ulang</span>{" "}
-            khusus buat lo.
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.12]">
+            Layanan Medis,{" "}
+            <span className="text-[#88D39E] font-medium italic">didesain ulang</span>{" "}
+            untuk hidupmu.
           </h1>
 
-          <p className="text-base sm:text-lg lg:text-xl text-[#C2D6CB] max-w-2xl mx-auto font-normal leading-relaxed">
-            Curhatin masalah jerawat, dark spot, atau breakout ke DermAssistant.
-            Dapet racikan formulasi yang pas buat kondisi kulit lo tanpa perlu antre di klinik.
+          <p className="text-sm sm:text-base lg:text-lg text-white/80 max-w-2xl mx-auto font-normal leading-relaxed">
+            Perawatan gula darah & diabetes online — simpel, langsung, dan dipimpin oleh Dokter Spesialis Penyakit Dalam (Sp.PD). Tanpa antrean klinik. Tanpa proses rumit. Hanya penanganan medis yang terbukti efektif.
           </p>
         </div>
 
-        {/* Floating 4 Categories Cards Overlay */}
-        <div className="mt-16 lg:mt-20">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 4 Cards Grid Directly on Dark Background */}
+        <div className="mt-14 lg:mt-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {categoryCards.map((card, idx) => (
               <div
                 key={idx}
                 onClick={() => onOpenChat(card.query)}
-                className="group relative bg-white text-[#1A1A1A] rounded-3xl p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 hover:-translate-y-1.5 shadow-xl hover:shadow-2xl border border-white/20"
+                className="group relative bg-white text-[#0A3020] rounded-3xl p-3.5 flex flex-col justify-between cursor-pointer transition-all duration-300 hover:-translate-y-1.5 shadow-xl hover:shadow-2xl border border-white/20"
               >
                 {/* Image Container */}
                 <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-[#FAF8F5]">
@@ -90,19 +94,20 @@ export default function Hero({ onOpenChat }: HeroProps) {
                   />
                 </div>
 
-                {/* Card Title & Arrow Footer */}
-                <div className="px-3 pt-4 pb-2 flex items-center justify-between">
-                  <span className="font-bold text-sm sm:text-base text-[#132E21] group-hover:text-[#285A41] transition-colors">
+                {/* Title & Arrow Footer */}
+                <div className="px-2 pt-3.5 pb-1 flex items-center justify-between">
+                  <span className="font-bold text-xs sm:text-sm text-[#0A3020] group-hover:text-[#E07A5F] transition-colors leading-snug">
                     {card.title}
                   </span>
-                  <div className="w-8 h-8 rounded-full bg-[#FAF8F5] group-hover:bg-[#132E21] text-[#132E21] group-hover:text-white flex items-center justify-center transition-colors">
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  <div className="w-7 h-7 rounded-full bg-[#FAF8F5] group-hover:bg-[#0A3020] text-[#0A3020] group-hover:text-white flex items-center justify-center transition-colors shrink-0">
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
+
       </div>
     </section>
   );

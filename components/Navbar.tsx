@@ -31,47 +31,48 @@ export default function Navbar({ onOpenChat }: NavbarProps) {
     <header
       className={`fixed top-0 z-40 w-full transition-all duration-300 ${
         isScrolled
-          ? "bg-[#132E21]/95 backdrop-blur-md border-b border-[#1E4431]/80 shadow-lg"
+          ? "bg-[#0D5C46]/95 backdrop-blur-md border-b border-[#1A8B6B]/80 shadow-lg"
           : "bg-transparent border-b border-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Horizontal Brand Logo */}
         <div className="flex items-center">
-          <div className="relative w-36 h-10 sm:w-40 sm:h-12">
+          <div className="relative w-36 h-10 sm:w-44 sm:h-12">
             <Image
               src="/images/logo_horizontal.png"
-              alt="MySkin Logo"
+              alt="GlucoCare Logo"
               fill
-              className="object-contain object-left"
+              className="object-contain"
               priority
             />
           </div>
         </div>
 
         {/* Navigation Links */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#C2D6CB]">
-          <a href="#masalah-kulit" className="hover:text-white transition-colors">
-            Masalah Kulit
+        <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-wider text-[#B0C4B8]">
+          <a href="#gejala" className="hover:text-white transition-colors">
+            Gejala Gula Darah
           </a>
-          <a href="#cara-kerja" className="hover:text-white transition-colors">
-            Cara Kerja
+          <a href="#alur" className="hover:text-white transition-colors">
+            Alur Konsultasi
           </a>
-          <a href="#produk" className="hover:text-white transition-colors">
-            Rekomendasi Formulasi
+          <a href="#obat" className="hover:text-white transition-colors">
+            Obat & Alat Cek
+          </a>
+          <a href="#dokter" className="hover:text-white transition-colors">
+            Dokter Spesialis Sp.PD
           </a>
         </nav>
 
-        {/* Action Button */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => onOpenChat("Halo, gue mau konsultasi masalah kulit muka gue.")}
-            className="flex items-center gap-2 bg-[#81C7A2] hover:bg-[#6EB892] text-[#132E21] px-5 py-2.5 rounded-full font-bold text-sm transition-all shadow-md active:scale-95 cursor-pointer"
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span>Konsul Derm</span>
-          </button>
-        </div>
+        {/* CTA Button */}
+        <button
+          onClick={() => onOpenChat("Halo, gue mau konsultasi masalah kadar gula darah.")}
+          className="flex items-center gap-2 bg-[#E07A5F] hover:bg-[#C9664B] text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Konsul Diabetes</span>
+        </button>
       </div>
     </header>
   );

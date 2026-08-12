@@ -10,34 +10,34 @@ interface HowItWorksProps {
 
 export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
   const checklist = [
-    "Formulasi pas sesuai kondisi riil muka lo",
-    "Stop buang duit buat skincare yang bikin breakout",
-    "Bahan aktif teruji (Salicylic, Niacinamide, Ceramide)",
-    "Dosis aman khusus biar skin barrier gak perih",
-    "Panduan pemakaian harian yang super simpel"
+    "Deteksi awal kadar gula darah puasa & HbA1c",
+    "Rekomendasi obat & alat monitor digital yang sesuai",
+    "Rujukan otomatis ke Dokter Spesialis Penyakit Dalam (Sp.PD)",
+    "Panduan pola makan low-GI & manajemen gaya hidup",
+    "Pencegahan komplikasi luka & ginjal sejak dini"
   ];
 
   return (
-    <section id="cara-kerja" className="py-24 bg-[#FBF8F5] text-[#1A2421] border-t border-[#EAE4DC]">
+    <section id="alur" className="py-24 bg-[#FBF8F5] text-[#1A2421] border-t border-[#EAE4DC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
           
-          {/* Left Column (Span 5) */}
+          {/* Left Column */}
           <div className="lg:col-span-5 space-y-10">
-            {/* Top Left Image Container - Clean Without Outer Background Color */}
+            {/* Top Left Image Container */}
             <div className="relative w-full aspect-[4/3] rounded-[2.5rem] overflow-hidden shadow-sm border border-[#E8DFC0]/40">
               <Image
-                src="/images/cream.png"
-                alt="Perawatan Skincare"
+                src="/images/how_glucometer.png"
+                alt="Aplikasi Telehealth & Alat Cek Gula Darah Digital"
                 fill
                 className="object-cover hover:scale-105 transition-transform duration-700"
               />
             </div>
 
-            {/* Checklist Section - Gen-Z Oriented */}
+            {/* Checklist Section */}
             <div className="space-y-5 pl-1">
-              <h3 className="text-2xl font-bold text-[#132E21] tracking-tight">
-                Skincare-an Gak Pake Drama
+              <h3 className="text-2xl font-bold text-[#0D5C46] tracking-tight">
+                Kontrol Diabetes Tanpa Ribet
               </h3>
 
               <ul className="space-y-3.5">
@@ -55,58 +55,56 @@ export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
             </div>
           </div>
 
-          {/* Right Column (Span 7) */}
+          {/* Right Column */}
           <div className="lg:col-span-7 space-y-12">
-            {/* Top Right Headline - Gen Z Oriented */}
+            {/* Top Right Headline */}
             <div className="space-y-3">
               <span className="text-xs font-extrabold tracking-[0.2em] text-[#E07A5F] uppercase">
-                Dermatologi Gen-Z
+                Diabetes Telehealth Care
               </span>
 
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#132E21] tracking-tight leading-[1.15]">
-                <span className="text-[#E07A5F]">Glow up</span> tanpa trial-error, jagain skin barrier muka lo.
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0D5C46] tracking-tight leading-[1.15]">
+                <span className="text-[#E07A5F]">Stabilkan gula darah</span> dengan panduan AI dan rujukan dokter spesialis.
               </h2>
             </div>
 
             {/* Middle 2 Vertical Editorial Cards */}
             <div className="grid grid-cols-2 gap-6">
-              {/* Card 1: Model Portrait */}
               <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-[#EAE3D9] border border-[#E2D9CC] shadow-sm">
                 <Image
-                  src="/images/issue_acne.png"
-                  alt="Model Kulit Sehat"
+                  src="/images/how_medication.png"
+                  alt="Obat Diabetes & Suplemen Herbal"
                   fill
                   className="object-cover hover:scale-105 transition-transform duration-700"
                 />
               </div>
 
-              {/* Card 2: Skincare Product Texture */}
               <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-[#EAE3D9] border border-[#E2D9CC] shadow-sm">
                 <Image
-                  src="/images/serum.png"
-                  alt="Bahan Aktif Skincare"
+                  src="/images/how_doctor.png"
+                  alt="Konsultasi Dokter Spesialis Penyakit Dalam"
                   fill
                   className="object-cover hover:scale-105 transition-transform duration-700"
                 />
               </div>
             </div>
 
-            {/* Bottom Story & CTA - Gen Z Oriented */}
+            {/* Bottom Story & CTA */}
             <div className="space-y-6 max-w-xl">
-              <h3 className="text-2xl sm:text-3xl font-extrabold text-[#132E21] tracking-tight leading-snug">
-                Stop kemakan racun skincare FYP yang gak cocok di muka
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-[#0D5C46] tracking-tight leading-snug">
+                AI cerdas yang tahu kapan harus menyambungkanmu ke Dokter Spesialis
               </h3>
 
               <p className="text-sm sm:text-base text-[#4A5550] leading-relaxed">
-                DermAssistant bakal bedah masalah kulit lo secara detail dan racikin kombinasi bahan aktif yang pas. Gak ada lagi cerita dompet menipis cuma buat coba-coba produk yang malah bikin muka makin perih dan breakout.
+                GlucoAssistant AI mendeteksi kadar gula darah & gejalamu secara instan. Apabila terindikasi risiko komplikasi tinggi atau jika kamu merasa konsultasi AI belum cukup, kamu langsung dirujuk ke Dokter Spesialis Penyakit Dalam (Sp.PD) kami.
               </p>
 
               <div className="pt-2">
                 <button
-                  onClick={() => onOpenChat("Gue mau konsul keluhan kulit muka sekarang.")}
-                  className="inline-flex items-center justify-center bg-[#E07A5F] hover:bg-[#C9664B] text-white px-9 py-4 rounded-full font-bold text-sm sm:text-base transition-all shadow-md hover:shadow-lg active:scale-95 uppercase tracking-wider"
+                  onClick={() => onOpenChat("Gue mau konsultasi keluhan kadar gula darah sekarang.")}
+                  className="inline-flex items-center justify-center bg-[#E07A5F] hover:bg-[#C9664B] text-white px-9 py-4 rounded-full font-bold text-sm sm:text-base transition-all shadow-md hover:shadow-lg active:scale-95 uppercase tracking-wider cursor-pointer"
                 >
-                  Konsul DermAssistant Sekarang
+                  Mulai Konsultasi Diabetes Sekarang
                 </button>
               </div>
             </div>
