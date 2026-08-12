@@ -16,7 +16,7 @@ export default function ProductsShowcase({ onOpenChat }: ProductsShowcaseProps) 
       price: "Rp 189.000",
       image: "/images/glucometer.png",
       ingredients: ["Kit Digital", "50 Strip Cek", "50 Jarum Lancet", "Garansi 1 Tahun"],
-      description: "Kit lengkap cek kadar gula darah puasa & sewaktu dengan hasil presisi instan 5 detik dan memori histori tes.",
+      description: "Kit lengkap cek kadar gula darah puasa & sewaktu dengan hasil serba cepat 5 detik dan memori histori tes.",
       query: "Gue mau pesan GlucoMeter Pro Digital Kit buat cek gula darah rutin di rumah."
     },
     {
@@ -63,7 +63,7 @@ export default function ProductsShowcase({ onOpenChat }: ProductsShowcaseProps) 
             </h2>
           </div>
           <p className="text-sm sm:text-base text-[#4A5D53] max-w-md leading-relaxed">
-            Pilihan obat regulasi gula darah terverifikasi, alat cek digital presisi, dan suplemen herbal alami.
+            Pilihan obat regulasi gula darah terverifikasi, alat cek digital praktis, dan suplemen herbal alami.
           </p>
         </div>
 
