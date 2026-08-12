@@ -49,8 +49,8 @@ function AdminShell({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) return null;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.replace("/admin/login");
   };
 

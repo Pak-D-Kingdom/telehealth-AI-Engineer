@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 
 export default function AdminLoginPage() {
@@ -13,20 +14,22 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const success = login(email, password);
-      if (success) {
-        router.push("/admin");
-      } else {
-        setError("Email atau password salah.");
-        setIsSubmitting(false);
-      }
-    }, 400);
+    try {
+      await login(email, password);
+      router.replace("/admin");
+    } catch (loginError) {
+      setError(
+        loginError instanceof ApiError
+          ? loginError.message
+          : "Tidak dapat memproses login saat ini.",
+      );
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -102,9 +105,8 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        {/* Simple Footer Hint */}
         <p className="text-center text-xs text-[#88D39E]/80">
-          admin@glucocare.id • glucocare2024
+          Gunakan akun admin yang dikonfigurasi pada backend.
         </p>
       </div>
     </div>

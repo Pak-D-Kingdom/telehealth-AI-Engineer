@@ -1,37 +1,62 @@
 "use client";
 
 import React, { useState } from "react";
-import { useDataStore, type Doctor } from "@/lib/data-store";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { ApiError } from "@/lib/api-client";
+import { useDataStore, type Doctor, type DoctorInput } from "@/lib/data-store";
 
-type FormData = Omit<Doctor, "id">;
+interface DoctorForm {
+  name: string;
+  specialty: string;
+  experience: string;
+  registrationNumber: string;
+  image: string;
+  isActive: boolean;
+  categoryIds: string[];
+}
 
-const EMPTY_FORM: FormData = {
+const EMPTY_FORM: DoctorForm = {
   name: "",
   specialty: "",
   experience: "",
-  str: "",
+  registrationNumber: "",
   image: "",
+  isActive: true,
   categoryIds: [],
 };
 
-const CATEGORY_OPTIONS = [
-  { id: "diabetes2", label: "Diabetes Tipe 2" },
-  { id: "ulkus", label: "Luka Diabetes (Ulkus)" },
-  { id: "insulin", label: "Sensitivitas Insulin" },
-  { id: "gestational", label: "Gestational Diabetes" },
-];
+function errorMessage(error: unknown) {
+  return error instanceof ApiError ? error.message : "Operasi dokter gagal diproses.";
+}
 
 export default function AdminDokterPage() {
-  const { doctors, addDoctor, updateDoctor, deleteDoctor } = useDataStore();
+  const {
+    doctors,
+    categories,
+    isLoading,
+    error,
+    addDoctor,
+    updateDoctor,
+    deleteDoctor,
+  } = useDataStore();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormData>(EMPTY_FORM);
+  const [form, setForm] = useState<DoctorForm>(EMPTY_FORM);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setActionError(null);
+  };
 
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setActionError(null);
     setShowForm(true);
   };
 
@@ -41,103 +66,121 @@ export default function AdminDokterPage() {
       name: doctor.name,
       specialty: doctor.specialty,
       experience: doctor.experience,
-      str: doctor.str,
-      image: doctor.image,
-      categoryIds: doctor.categoryIds,
+      registrationNumber: doctor.registrationNumber ?? "",
+      image: doctor.image ?? "",
+      isActive: doctor.isActive,
+      categoryIds: doctor.categories.map((category) => category.id),
     });
+    setActionError(null);
     setShowForm(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingId) {
-      updateDoctor(editingId, form);
-    } else {
-      addDoctor(form);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (form.categoryIds.length === 0) {
+      setActionError("Pilih minimal satu bidang keahlian.");
+      return;
     }
-    setShowForm(false);
-    setEditingId(null);
-    setForm(EMPTY_FORM);
+
+    setActionError(null);
+    setIsSaving(true);
+    const input: DoctorInput = {
+      name: form.name.trim(),
+      specialty: form.specialty.trim(),
+      experience: form.experience.trim(),
+      registrationNumber: form.registrationNumber.trim() || null,
+      image: form.image.trim() || null,
+      isActive: form.isActive,
+      categoryIds: form.categoryIds,
+    };
+
+    try {
+      if (editingId) {
+        await updateDoctor(editingId, input);
+      } else {
+        await addDoctor(input);
+      }
+      closeForm();
+    } catch (submitError) {
+      setActionError(errorMessage(submitError));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    deleteDoctor(id);
-    setDeleteConfirm(null);
+  const handleDelete = async (id: string) => {
+    setActionError(null);
+    setIsSaving(true);
+    try {
+      await deleteDoctor(id);
+      setDeleteConfirm(null);
+    } catch (deleteError) {
+      setActionError(errorMessage(deleteError));
+      setDeleteConfirm(null);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const updateField = (field: keyof FormData, value: string | string[]) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const updateField = (field: keyof DoctorForm, value: string | boolean | string[]) => {
+    setForm((previous) => ({ ...previous, [field]: value }));
   };
 
-  const toggleCategory = (catId: string) => {
-    setForm((prev) => {
-      const exists = prev.categoryIds.includes(catId);
-      return {
-        ...prev,
-        categoryIds: exists
-          ? prev.categoryIds.filter((c) => c !== catId)
-          : [...prev.categoryIds, catId],
-      };
-    });
+  const toggleCategory = (categoryId: string) => {
+    updateField(
+      "categoryIds",
+      form.categoryIds.includes(categoryId)
+        ? form.categoryIds.filter((id) => id !== categoryId)
+        : [...form.categoryIds, categoryId],
+    );
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0D5C46] tracking-tight">
-            Dokter Spesialis
-          </h1>
-          <p className="text-sm text-[#6B7C72] mt-1">
-            Kelola data dokter spesialis penyakit dalam
-          </p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Dokter Spesialis</h1>
+          <p className="mt-1 text-sm text-[#6B7C72]">Kelola dokter dan bidang keahliannya di PostgreSQL.</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 bg-[#0D5C46] hover:bg-[#0A4A38] text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
+        <button onClick={openCreate} disabled={categories.length === 0} className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#0D5C46] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#0A4A38] disabled:cursor-not-allowed disabled:opacity-50">
+          <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Tambah Dokter</span>
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-[#EAE4DC] overflow-hidden">
-        {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
+      {(error || (actionError && !showForm)) && (
+        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{actionError ?? error}</p>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-[#EAE4DC] bg-white">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-[#EAE4DC] bg-[#FAF8F5]">
-                <th className="px-6 py-3 text-xs font-bold text-[#6B7C72] uppercase tracking-wider">Nama Dokter</th>
-                <th className="px-6 py-3 text-xs font-bold text-[#6B7C72] uppercase tracking-wider">Spesialisasi</th>
-                <th className="px-6 py-3 text-xs font-bold text-[#6B7C72] uppercase tracking-wider">Pengalaman</th>
-                <th className="px-6 py-3 text-xs font-bold text-[#6B7C72] uppercase tracking-wider text-right">Aksi</th>
+                {['Nama Dokter', 'Spesialisasi', 'Pengalaman', 'Status', 'Aksi'].map((label) => (
+                  <th key={label} className={`px-6 py-3 text-xs font-bold uppercase tracking-wider text-[#6B7C72] ${label === 'Aksi' ? 'text-right' : ''}`}>{label}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F2ECE4]">
               {doctors.map((doctor) => (
-                <tr key={doctor.id} className="hover:bg-[#FAF8F5]/50 transition-colors">
+                <tr key={doctor.id} className="transition-colors hover:bg-[#FAF8F5]/50">
                   <td className="px-6 py-4">
                     <p className="text-sm font-semibold text-[#1A2421]">{doctor.name}</p>
-                    <p className="text-xs text-[#6B7C72] mt-0.5">{doctor.str}</p>
+                    <p className="mt-0.5 text-xs text-[#6B7C72]">{doctor.registrationNumber || "No. registrasi belum diisi"}</p>
                   </td>
-                  <td className="px-6 py-4 text-sm text-[#4A5D53]">{doctor.specialty}</td>
+                  <td className="px-6 py-4 text-sm text-[#4A5D53]">
+                    <p>{doctor.specialty}</p>
+                    <p className="mt-1 text-xs text-[#6B7C72]">{doctor.categories.map((category) => category.name).join(", ")}</p>
+                  </td>
                   <td className="px-6 py-4 text-sm text-[#6B7C72]">{doctor.experience}</td>
                   <td className="px-6 py-4">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${doctor.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{doctor.isActive ? "Aktif" : "Nonaktif"}</span>
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(doctor)}
-                        className="p-2 rounded-lg hover:bg-[#0D5C46]/10 text-[#6B7C72] hover:text-[#0D5C46] transition-colors cursor-pointer"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm(doctor.id)}
-                        className="p-2 rounded-lg hover:bg-red-50 text-[#6B7C72] hover:text-red-500 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <button aria-label={`Edit ${doctor.name}`} onClick={() => openEdit(doctor)} className="cursor-pointer rounded-lg p-2 text-[#6B7C72] hover:bg-[#0D5C46]/10 hover:text-[#0D5C46]"><Pencil className="h-4 w-4" /></button>
+                      <button aria-label={`Hapus ${doctor.name}`} onClick={() => setDeleteConfirm(doctor.id)} className="cursor-pointer rounded-lg p-2 text-[#6B7C72] hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -146,177 +189,66 @@ export default function AdminDokterPage() {
           </table>
         </div>
 
-        {/* Mobile Cards */}
-        <div className="md:hidden divide-y divide-[#F2ECE4]">
+        <div className="divide-y divide-[#F2ECE4] md:hidden">
           {doctors.map((doctor) => (
-            <div key={doctor.id} className="p-4 space-y-2">
-              <div>
-                <p className="text-sm font-semibold text-[#1A2421]">{doctor.name}</p>
-                <p className="text-xs text-[#6B7C72]">{doctor.specialty}</p>
-                <p className="text-xs text-[#6B7C72]">{doctor.experience}</p>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => openEdit(doctor)}
-                  className="text-xs font-semibold text-[#0D5C46] hover:underline cursor-pointer"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(doctor.id)}
-                  className="text-xs font-semibold text-red-500 hover:underline cursor-pointer"
-                >
-                  Hapus
-                </button>
+            <div key={doctor.id} className="space-y-2 p-4">
+              <p className="text-sm font-semibold text-[#1A2421]">{doctor.name}</p>
+              <p className="text-xs text-[#6B7C72]">{doctor.specialty} · {doctor.experience}</p>
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => openEdit(doctor)} className="cursor-pointer text-xs font-semibold text-[#0D5C46] hover:underline">Edit</button>
+                <button onClick={() => setDeleteConfirm(doctor.id)} className="cursor-pointer text-xs font-semibold text-red-500 hover:underline">Hapus</button>
               </div>
             </div>
           ))}
         </div>
-
-        {doctors.length === 0 && (
-          <div className="px-6 py-12 text-center text-sm text-[#6B7C72]">
-            Belum ada dokter. Klik &quot;Tambah Dokter&quot; untuk menambahkan.
-          </div>
-        )}
+        {isLoading && <div className="px-6 py-12 text-center text-sm text-[#6B7C72]">Memuat dokter...</div>}
+        {!isLoading && doctors.length === 0 && <div className="px-6 py-12 text-center text-sm text-[#6B7C72]">Belum ada dokter.</div>}
       </div>
 
-      {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-[#1A2421]">Hapus Dokter?</h3>
-            <p className="text-sm text-[#6B7C72]">
-              Data dokter ini akan dihapus secara permanen.
-            </p>
+          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold text-[#1A2421]">Hapus Dokter?</h2>
+            <p className="text-sm text-[#6B7C72]">Data ini akan dihapus permanen dari database.</p>
             <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl border border-[#EAE4DC] text-sm font-semibold text-[#4A5D53] hover:bg-[#FAF8F5] transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors cursor-pointer"
-              >
-                Hapus
-              </button>
+              <button onClick={() => setDeleteConfirm(null)} disabled={isSaving} className="flex-1 cursor-pointer rounded-xl border border-[#EAE4DC] py-2.5 text-sm font-semibold text-[#4A5D53]">Batal</button>
+              <button onClick={() => handleDelete(deleteConfirm)} disabled={isSaving} className="flex-1 cursor-pointer rounded-xl bg-red-500 py-2.5 text-sm font-bold text-white disabled:opacity-60">{isSaving ? "Menghapus..." : "Hapus"}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Create/Edit Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-12 pb-8 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#EAE4DC]">
-              <h3 className="text-lg font-bold text-[#0D5C46]">
-                {editingId ? "Edit Dokter" : "Tambah Dokter Baru"}
-              </h3>
-              <button
-                onClick={() => setShowForm(false)}
-                className="p-1 rounded-lg hover:bg-[#FAF8F5] text-[#6B7C72] hover:text-[#1A2421] transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#EAE4DC] px-6 py-4">
+              <h2 className="text-lg font-bold text-[#0D5C46]">{editingId ? "Edit Dokter" : "Tambah Dokter Baru"}</h2>
+              <button aria-label="Tutup formulir" onClick={closeForm} className="cursor-pointer rounded-lg p-1 text-[#6B7C72] hover:bg-[#FAF8F5]"><X className="h-5 w-5" /></button>
             </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#3A4F46] uppercase tracking-wider">Nama Dokter</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => updateField("name", e.target.value)}
-                  placeholder="dr. Nama Lengkap, Sp.PD"
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#DDD8D0] bg-[#FAF8F5] text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C46]/30 focus:border-[#0D5C46]"
-                />
+            <form onSubmit={handleSubmit} className="space-y-4 p-6">
+              {actionError && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">{actionError}</p>}
+              <FormField label="Nama Dokter"><input required minLength={2} maxLength={160} value={form.name} onChange={(event) => updateField("name", event.target.value)} placeholder="dr. Nama Lengkap, Sp.PD" className="form-input" /></FormField>
+              <FormField label="Spesialisasi"><input required minLength={2} maxLength={180} value={form.specialty} onChange={(event) => updateField("specialty", event.target.value)} className="form-input" /></FormField>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label="Pengalaman"><input required minLength={2} maxLength={100} value={form.experience} onChange={(event) => updateField("experience", event.target.value)} placeholder="10+ Tahun" className="form-input" /></FormField>
+                <FormField label="No. Registrasi"><input maxLength={120} value={form.registrationNumber} onChange={(event) => updateField("registrationNumber", event.target.value)} placeholder="STR/SIP" className="form-input" /></FormField>
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#3A4F46] uppercase tracking-wider">Spesialisasi</label>
-                <input
-                  type="text"
-                  value={form.specialty}
-                  onChange={(e) => updateField("specialty", e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#DDD8D0] bg-[#FAF8F5] text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C46]/30 focus:border-[#0D5C46]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#3A4F46] uppercase tracking-wider">Pengalaman</label>
-                  <input
-                    type="text"
-                    value={form.experience}
-                    onChange={(e) => updateField("experience", e.target.value)}
-                    placeholder="10+ Tahun Pengalaman"
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#DDD8D0] bg-[#FAF8F5] text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C46]/30 focus:border-[#0D5C46]"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#3A4F46] uppercase tracking-wider">No. STR</label>
-                  <input
-                    type="text"
-                    value={form.str}
-                    onChange={(e) => updateField("str", e.target.value)}
-                    placeholder="STR & SIP Kemenkes RI"
-                    className="w-full px-4 py-2.5 rounded-xl border border-[#DDD8D0] bg-[#FAF8F5] text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C46]/30 focus:border-[#0D5C46]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#3A4F46] uppercase tracking-wider">URL Foto</label>
-                <input
-                  type="text"
-                  value={form.image}
-                  onChange={(e) => updateField("image", e.target.value)}
-                  placeholder="/images/doctor.png"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#DDD8D0] bg-[#FAF8F5] text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C46]/30 focus:border-[#0D5C46]"
-                />
-              </div>
-
-              {/* Category Checkboxes */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-[#3A4F46] uppercase tracking-wider">Bidang Keahlian</label>
+              <FormField label="URL Foto"><input maxLength={500} value={form.image} onChange={(event) => updateField("image", event.target.value)} placeholder="/images/doctor.png" className="form-input" /></FormField>
+              <fieldset className="space-y-2">
+                <legend className="text-xs font-bold uppercase tracking-wider text-[#3A4F46]">Bidang Keahlian</legend>
                 <div className="flex flex-wrap gap-2">
-                  {CATEGORY_OPTIONS.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => toggleCategory(cat.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${form.categoryIds.includes(cat.id)
-                          ? "bg-[#0D5C46] text-white border-[#0D5C46]"
-                          : "bg-white text-[#4A5D53] border-[#DDD8D0] hover:border-[#0D5C46]"
-                        }`}
-                    >
-                      {cat.label}
-                    </button>
+                  {categories.map((category) => (
+                    <button key={category.id} type="button" onClick={() => toggleCategory(category.id)} className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${form.categoryIds.includes(category.id) ? 'border-[#0D5C46] bg-[#0D5C46] text-white' : 'border-[#DDD8D0] bg-white text-[#4A5D53] hover:border-[#0D5C46]'}`}>{category.name}</button>
                   ))}
                 </div>
-              </div>
-
+              </fieldset>
+              <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-[#3A4F46]">
+                <input type="checkbox" checked={form.isActive} onChange={(event) => updateField("isActive", event.target.checked)} className="h-4 w-4 accent-[#0D5C46]" />
+                Tampilkan dokter di katalog publik
+              </label>
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-[#EAE4DC] text-sm font-semibold text-[#4A5D53] hover:bg-[#FAF8F5] transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-[#0D5C46] hover:bg-[#0A4A38] text-white text-sm font-bold transition-colors cursor-pointer"
-                >
-                  {editingId ? "Simpan Perubahan" : "Tambah Dokter"}
-                </button>
+                <button type="button" onClick={closeForm} disabled={isSaving} className="flex-1 cursor-pointer rounded-xl border border-[#EAE4DC] py-2.5 text-sm font-semibold text-[#4A5D53]">Batal</button>
+                <button type="submit" disabled={isSaving} className="flex-1 cursor-pointer rounded-xl bg-[#0D5C46] py-2.5 text-sm font-bold text-white disabled:opacity-60">{isSaving ? "Menyimpan..." : editingId ? "Simpan Perubahan" : "Tambah Dokter"}</button>
               </div>
             </form>
           </div>
@@ -324,4 +256,8 @@ export default function AdminDokterPage() {
       )}
     </div>
   );
+}
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-[#3A4F46]">{label}</span>{children}</label>;
 }

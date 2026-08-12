@@ -57,8 +57,8 @@ export function DotPattern({
       return {
         x: col * width + cx + x,
         y: row * height + cy + y,
-        delay: Math.random() * 4,
-        duration: Math.random() * 2.5 + 2,
+        delay: ((i * 37) % 400) / 100,
+        duration: 2 + ((i * 53) % 250) / 100,
       };
     }
   );

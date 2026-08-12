@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { X, Send, ShoppingCart, Stethoscope, Syringe, ChevronRight, ArrowRight } from "lucide-react";
 
 interface ProductRec {
@@ -37,11 +38,13 @@ interface ChatBotProps {
 }
 
 export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatBotProps) {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [cart, setCart] = useState<{ [key: string]: { rec: ProductRec; qty: number } }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const handledInitialQueryRef = useRef<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -51,13 +54,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     scrollToBottom();
   }, [messages, isTyping]);
 
-  useEffect(() => {
-    if (initialQuery && isOpen) {
-      handleSendMessage(initialQuery);
-    }
-  }, [initialQuery, isOpen]);
-
-  const generateAIResponse = (userText: string) => {
+  const generateAIResponse = useCallback((userText: string) => {
     const textLower = userText.toLowerCase();
     let replyText = "";
     let items: ProductRec[] = [];
@@ -151,10 +148,9 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
         }
       ]);
     }, 900);
-  };
+  }, []);
 
-  const handleSendMessage = (textToSend?: string) => {
-    const query = textToSend || input;
+  const sendMessage = useCallback((query: string) => {
     if (!query.trim()) return;
 
     const userMessage: Message = {
@@ -165,10 +161,26 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    if (!textToSend) setInput("");
     setIsTyping(true);
-
     generateAIResponse(query);
+  }, [generateAIResponse]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      handledInitialQueryRef.current = null;
+      return;
+    }
+
+    if (initialQuery && handledInitialQueryRef.current !== initialQuery) {
+      handledInitialQueryRef.current = initialQuery;
+      sendMessage(initialQuery);
+    }
+  }, [initialQuery, isOpen, sendMessage]);
+
+  const handleSendMessage = (textToSend?: string) => {
+    const query = textToSend || input;
+    sendMessage(query);
+    if (!textToSend && query.trim()) setInput("");
   };
 
   const updateCart = (product: ProductRec, delta: number) => {
@@ -473,7 +485,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                     qty: item.qty
                   }));
                   localStorage.setItem("myskin_cart", JSON.stringify(items));
-                  window.location.href = "/checkout";
+                  router.push("/checkout");
                 }}
                 className="bg-[#E07A5F] hover:bg-[#C9664B] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
               >

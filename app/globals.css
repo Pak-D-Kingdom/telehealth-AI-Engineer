@@ -32,3 +32,19 @@ body {
 .animate-pulse-glow {
   animation: pulseGlow 3s infinite ease-in-out;
 }
+
+.form-input {
+  width: 100%;
+  border: 1px solid #DDD8D0;
+  border-radius: 0.75rem;
+  background: #FAF8F5;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.form-input:focus {
+  border-color: #0D5C46;
+  box-shadow: 0 0 0 3px rgb(13 92 70 / 0.2);
+}

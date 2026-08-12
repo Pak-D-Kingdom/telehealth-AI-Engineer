@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -22,8 +22,67 @@ interface CartItem {
   qty: number;
 }
 
+const CART_KEY = "myskin_cart";
+const CART_CHANGE_EVENT = "telehealth-cart-change";
+const DEFAULT_ITEMS: CartItem[] = [
+  {
+    id: "p1",
+    name: "GlucoMeter Pro Digital Kit",
+    unit: "Digital Kit + 50 Strip",
+    price: 189000,
+    image: "/images/glucometer.png",
+    qty: 1,
+  },
+  {
+    id: "p2",
+    name: "Metformin 500mg Release Control",
+    unit: "Obat Regulasional 30 Tab",
+    price: 45000,
+    image: "/images/metformin.png",
+    qty: 2,
+  },
+];
+
+function subscribeToCart(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(CART_CHANGE_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(CART_CHANGE_EVENT, callback);
+  };
+}
+
+function getCartSnapshot() {
+  return localStorage.getItem(CART_KEY);
+}
+
+function getServerCartSnapshot() {
+  return null;
+}
+
+function parseCart(value: string | null): CartItem[] {
+  if (!value) return DEFAULT_ITEMS;
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as CartItem[]) : DEFAULT_ITEMS;
+  } catch {
+    return DEFAULT_ITEMS;
+  }
+}
+
+function saveCart(items: CartItem[]) {
+  localStorage.setItem(CART_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event(CART_CHANGE_EVENT));
+}
+
 export default function CheckoutPage() {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const cartSnapshot = useSyncExternalStore(
+    subscribeToCart,
+    getCartSnapshot,
+    getServerCartSnapshot,
+  );
+  const items = useMemo(() => parseCart(cartSnapshot), [cartSnapshot]);
   const [step, setStep] = useState<"checkout" | "success" | "failed">("checkout");
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -41,53 +100,13 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<"qris" | "va" | "cod">("qris");
   const [selectedBank, setSelectedBank] = useState<string>("BCA");
 
-  // Load Cart Items from LocalStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("myskin_cart");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setItems(parsed);
-          return;
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    // Default Fallback Items
-    setItems([
-      {
-        id: "p1",
-        name: "GlucoMeter Pro Digital Kit",
-        unit: "Digital Kit + 50 Strip",
-        price: 189000,
-        image: "/images/glucometer.png",
-        qty: 1
-      },
-      {
-        id: "p2",
-        name: "Metformin 500mg Release Control",
-        unit: "Obat Regulasional 30 Tab",
-        price: 45000,
-        image: "/images/metformin.png",
-        qty: 2
-      }
-    ]);
-  }, []);
-
   const updateQty = (id: string, delta: number) => {
-    setItems((prev) =>
-      prev
-        .map((item) => {
-          if (item.id === id) {
-            const newQty = item.qty + delta;
-            return newQty > 0 ? { ...item, qty: newQty } : null;
-          }
-          return item;
-        })
-        .filter(Boolean) as CartItem[]
+    saveCart(
+      items
+        .map((item) =>
+          item.id === id ? { ...item, qty: item.qty + delta } : item,
+        )
+        .filter((item) => item.qty > 0),
     );
   };
 
@@ -110,7 +129,8 @@ export default function CheckoutPage() {
     setTimeout(() => {
       setIsProcessing(false);
       if (simulateSuccess) {
-        localStorage.removeItem("myskin_cart");
+        localStorage.removeItem(CART_KEY);
+        window.dispatchEvent(new Event(CART_CHANGE_EVENT));
         setStep("success");
       } else {
         setStep("failed");

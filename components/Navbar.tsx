@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { MessageSquare, Menu, X } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 interface NavbarProps {
   onOpenChat: (initialQuery?: string) => void;
