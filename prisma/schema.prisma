@@ -6,3 +6,91 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum UserRole {
+  ADMIN
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique @db.VarChar(255)
+  passwordHash String        @map("password_hash")
+  name         String        @db.VarChar(120)
+  role         UserRole      @default(ADMIN)
+  isActive     Boolean       @default(true) @map("is_active")
+  sessions     UserSession[]
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model UserSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.Char(64)
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model Product {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique @db.VarChar(160)
+  name        String   @db.VarChar(160)
+  category    String   @db.VarChar(120)
+  price       Int
+  image       String?  @db.VarChar(500)
+  specs       String?
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([category])
+  @@map("products")
+}
+
+model Doctor {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  slug               String                     @unique @db.VarChar(160)
+  name               String                     @db.VarChar(160)
+  specialty          String                     @db.VarChar(180)
+  experience         String                     @db.VarChar(100)
+  registrationNumber String?                    @map("registration_number") @db.VarChar(120)
+  image              String?                    @db.VarChar(500)
+  isActive           Boolean                    @default(true) @map("is_active")
+  categories         DoctorCategoryAssignment[]
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  updatedAt          DateTime                   @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("doctors")
+}
+
+model DoctorCategory {
+  id          String                     @id @db.VarChar(50)
+  name        String                     @unique @db.VarChar(120)
+  description String?
+  doctors     DoctorCategoryAssignment[]
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
+
+  @@map("doctor_categories")
+}
+
+model DoctorCategoryAssignment {
+  doctorId   String         @map("doctor_id") @db.Uuid
+  categoryId String         @map("category_id") @db.VarChar(50)
+  doctor     Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  category   DoctorCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, categoryId])
+  @@index([categoryId])
+  @@map("doctor_category_assignments")
+}
