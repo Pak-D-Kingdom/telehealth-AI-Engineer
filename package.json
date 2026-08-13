@@ -17,9 +17,11 @@
     "db:migrate": "bunx --bun prisma migrate dev",
     "db:deploy": "bunx --bun prisma migrate deploy",
     "db:seed": "bunx --bun prisma db seed",
+    "db:seed:knowledge": "bun scripts/seed-knowledge.ts",
     "db:studio": "bunx --bun prisma studio",
     "postinstall": "bunx --bun prisma generate",
-    "test": "NODE_ENV=test bun test"
+    "test": "NODE_ENV=test bun test",
+    "test:e2e:chat": "bun scripts/test-chatbot-e2e.ts"
   },
   "keywords": [],
   "author": "",

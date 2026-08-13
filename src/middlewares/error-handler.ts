@@ -19,6 +19,11 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof AppError) {
+    const retryAfterSeconds = readRetryAfterSeconds(error.details);
+    if (error.code === "AI_RATE_LIMITED" && retryAfterSeconds) {
+      res.setHeader("Retry-After", retryAfterSeconds.toString());
+    }
+
     res.status(error.statusCode).json({
       error: {
         code: error.code,
@@ -81,3 +86,14 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     },
   });
 };
+
+function readRetryAfterSeconds(details: unknown) {
+  if (!details || typeof details !== "object" || !("retryAfterSeconds" in details)) {
+    return undefined;
+  }
+
+  const value = details.retryAfterSeconds;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.ceil(value)
+    : undefined;
+}

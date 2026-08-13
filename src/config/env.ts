@@ -6,6 +6,13 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   FRONTEND_URL: z.string().url().default("http://localhost:3000"),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+  CHAT_SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+  GROQ_API_KEY: z.string().trim().min(1).optional(),
+  GROQ_CHAT_MODEL: z.string().trim().min(1).default("llama-3.3-70b-versatile"),
+  GROQ_EXTRACTION_MODEL: z.string().trim().min(1).default("llama-3.1-8b-instant"),
+  GEMINI_API_KEY: z.string().trim().min(1).optional(),
+  GEMINI_EMBEDDING_MODEL: z.string().trim().min(1).default("gemini-embedding-001"),
+  AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -13,6 +13,8 @@ import {
   doctorRouter,
 } from "./routes/doctor.routes";
 import { errorHandler, notFoundHandler } from "./middlewares/error-handler";
+import { chatRouter } from "./routes/chat.routes";
+import { adminChatRouter } from "./routes/admin-chat.routes";
 
 export const app = express();
 
@@ -61,6 +63,8 @@ app.use("/api/admin/products", adminProductRouter);
 app.use("/api/doctors", doctorRouter);
 app.use("/api/admin/doctors", adminDoctorRouter);
 app.use("/api/doctor-categories", doctorCategoryRouter);
+app.use("/api/chat", chatRouter);
+app.use("/api/admin/chat", adminChatRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

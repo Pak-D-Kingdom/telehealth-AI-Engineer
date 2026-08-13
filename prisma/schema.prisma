@@ -11,6 +11,23 @@ enum UserRole {
   ADMIN
 }
 
+enum ChatSessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum LeadQualificationStatus {
+  ELIGIBLE
+  NEEDS_REVIEW
+  NOT_ELIGIBLE
+}
+
 model User {
   id           String        @id @default(uuid()) @db.Uuid
   email        String        @unique @db.VarChar(255)
@@ -93,4 +110,61 @@ model DoctorCategoryAssignment {
   @@id([doctorId, categoryId])
   @@index([categoryId])
   @@map("doctor_category_assignments")
+}
+
+model ChatSession {
+  id           String            @id @default(uuid()) @db.Uuid
+  tokenHash    String            @unique @map("token_hash") @db.Char(64)
+  status       ChatSessionStatus @default(ACTIVE)
+  leadCaptured Boolean           @default(false) @map("lead_captured")
+  isEmergency  Boolean           @default(false) @map("is_emergency")
+  expiresAt    DateTime          @map("expires_at")
+  messages     ChatMessage[]
+  lead         ChatLead?
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@index([expiresAt])
+  @@index([status])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String          @id @default(uuid()) @db.Uuid
+  sessionId String          @map("session_id") @db.Uuid
+  role      ChatMessageRole
+  content   String
+  session   ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
+
+model ChatLead {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  sessionId           String                   @unique @map("session_id") @db.Uuid
+  name                String?                  @db.VarChar(160)
+  whatsapp            String?                  @db.VarChar(40)
+  diabetesType        String?                  @map("diabetes_type") @db.VarChar(80)
+  currentMedication   String?                  @map("current_medication")
+  primaryComplaint    String?                  @map("primary_complaint")
+  qualificationStatus LeadQualificationStatus? @map("qualification_status")
+  session             ChatSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+
+  @@map("chat_leads")
+}
+
+model KnowledgeBase {
+  id        String                @id @default(uuid()) @db.Uuid
+  title     String                @db.VarChar(240)
+  content   String
+  embedding Unsupported("vector(3072)")
+  source    String                @unique @db.VarChar(240)
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
+
+  @@map("knowledge_base")
 }
