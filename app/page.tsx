@@ -16,9 +16,7 @@ export default function Home() {
   const [initialQuery, setInitialQuery] = useState<string | undefined>(undefined);
 
   const handleOpenChat = (query?: string) => {
-    if (query) {
-      setInitialQuery(query);
-    }
+    setInitialQuery(query);
     setIsChatOpen(true);
   };
 

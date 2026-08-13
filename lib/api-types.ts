@@ -17,6 +17,54 @@ export interface AdminUser {
   role: "ADMIN";
 }
 
+export type ChatSessionStatus = "ACTIVE" | "COMPLETED" | "ABANDONED";
+export type LeadQualificationStatus = "ELIGIBLE" | "NEEDS_REVIEW" | "NOT_ELIGIBLE";
+
+export interface AdminChatLead {
+  id: string;
+  sessionId: string;
+  name: string | null;
+  whatsapp: string | null;
+  diabetesType: string | null;
+  currentMedication: string | null;
+  primaryComplaint: string | null;
+  qualificationStatus: LeadQualificationStatus | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminChatSession {
+  id: string;
+  status: ChatSessionStatus;
+  leadCaptured: boolean;
+  isEmergency: boolean;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  lead: AdminChatLead | null;
+  messageCount: number;
+}
+
+export interface AdminChatMessage {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  createdAt: string;
+}
+
+export interface AdminChatDetail extends AdminChatSession {
+  messages: AdminChatMessage[];
+}
+
+export interface AdminChatStats {
+  total: number;
+  active: number;
+  completed: number;
+  emergency: number;
+  captured: number;
+  needsReview: number;
+}
+
 export interface Product {
   id: string;
   slug: string;

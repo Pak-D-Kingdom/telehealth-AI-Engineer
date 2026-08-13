@@ -2,12 +2,18 @@
 
 import React from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { useDataStore } from "@/lib/data-store";
+import { apiFetcher } from "@/lib/api-client";
+import type { AdminChatStats, ApiResponse } from "@/lib/api-types";
 import { formatRupiah } from "@/lib/formatters";
-import { Package, Stethoscope, ArrowRight } from "lucide-react";
+import { Package, Stethoscope, ArrowRight, MessageSquareText } from "lucide-react";
 
 export default function AdminDashboard() {
   const { products, doctors, isLoading, error } = useDataStore();
+  const { data: chatStatsResponse, isLoading: chatStatsLoading } = useSWR<
+    ApiResponse<AdminChatStats>
+  >("/api/admin/chat/stats", apiFetcher, { revalidateOnFocus: false });
 
   const stats = [
     {
@@ -23,6 +29,13 @@ export default function AdminDashboard() {
       icon: Stethoscope,
       href: "/admin/dokter",
       color: "bg-[#0D5C46]/10 text-[#0D5C46]",
+    },
+    {
+      label: "Lead Chatbot Lengkap",
+      value: chatStatsResponse?.data.captured ?? 0,
+      icon: MessageSquareText,
+      href: "/admin/chat",
+      color: "bg-amber-50 text-amber-700",
     },
   ];
 
@@ -44,7 +57,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map((stat) => (
           <Link
             key={stat.href}
@@ -58,7 +71,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-extrabold text-[#1A2421]">
-                    {isLoading ? "…" : stat.value}
+                    {isLoading || (stat.href === "/admin/chat" && chatStatsLoading) ? "…" : stat.value}
                   </p>
                   <p className="text-xs font-semibold text-[#6B7C72] mt-0.5">{stat.label}</p>
                 </div>

@@ -1,6 +1,6 @@
 # Telehealth Frontend
 
-Frontend GlucoCare menggunakan Next.js, React, TypeScript, Tailwind CSS, dan Bun. Aplikasi mengambil katalog produk dan dokter dari `telehealth-backend`, serta menyediakan dashboard admin dengan autentikasi session cookie.
+Frontend GlucoCare menggunakan Next.js, React, TypeScript, Tailwind CSS, dan Bun. Aplikasi mengambil katalog, data dokter, autentikasi admin, dan layanan chatbot dari `telehealth-backend`.
 
 ## Prasyarat
 
@@ -51,6 +51,8 @@ docker compose version
    bun run dev
    ```
 
+   Chatbot membutuhkan `GROQ_API_KEY` dan `GEMINI_API_KEY` baru pada `.env` backend. Setelah keduanya diisi, jalankan `bun run db:seed:knowledge` sebelum memakai fitur RAG.
+
 5. Kembali ke frontend dan jalankan development server:
 
    ```bash
@@ -67,8 +69,14 @@ Frontend menggunakan API berikut:
 - katalog publik: `/api/products`, `/api/doctors`, dan `/api/doctor-categories`
 - autentikasi admin: `/api/auth/login`, `/api/auth/me`, dan `/api/auth/logout`
 - dashboard admin: `/api/admin/products`, `/api/admin/doctors`, serta endpoint CRUD produk dan dokter
+- dashboard chat/lead: `/api/admin/chat/stats` dan `/api/admin/chat/sessions`
+- chatbot: `POST /api/chat`, `GET /api/chat`, dan `DELETE /api/chat`
 
-Request autentikasi memakai cookie HTTP-only dan `credentials: "include"`. Karena itu, nilai `FRONTEND_URL` pada backend harus sama dengan origin frontend, secara default `http://localhost:3000`.
+Request autentikasi admin dan chatbot memakai cookie HTTP-only serta `credentials: "include"`. Karena itu, nilai `FRONTEND_URL` pada backend harus sama dengan origin frontend, secara default `http://localhost:3000`.
+
+Widget chat memulihkan histori dari backend ketika dibuka, mengirim pesan langsung ke API, dan menampilkan respons darurat yang ditandai backend. Tidak ada lagi respons medis berbasis kata kunci atau data percakapan palsu di frontend.
+
+Admin dapat membuka `/admin/chat` untuk mencari session, memfilter emergency/lead/status, membaca histori, menyelesaikan session, dan memberikan status kualifikasi lead.
 
 ## Pemeriksaan Kode
 
