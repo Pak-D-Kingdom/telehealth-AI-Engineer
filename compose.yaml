@@ -1,0 +1,11 @@
+services:
+  telehealth-ai:
+    build: .
+    container_name: telehealth_ai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
