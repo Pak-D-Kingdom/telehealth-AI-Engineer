@@ -1,0 +1,21 @@
+# Core LLM & API
+groq>=0.11.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
+# RAG & Embeddings
+sentence-transformers>=3.0.0
+faiss-cpu>=1.8.0
+ollama>=0.3.0
+httpx>=0.27.0
+
+# Database & Config
+sqlalchemy>=2.0.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+pyyaml>=6.0.0
+
+# Notebook & Testing
+jupyter
+pytest

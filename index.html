@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diabetes AI Health Assistant</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; background: #f4f4f9; }
+        #chat-container { border: 1px solid #ccc; height: 450px; overflow-y: auto; padding: 15px; margin-bottom: 15px; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .message { margin-bottom: 12px; padding: 10px 15px; border-radius: 12px; max-width: 85%; line-height: 1.4; }
+        .user { background: #dcf8c6; margin-left: auto; text-align: right; border-bottom-right-radius: 0; }
+        .bot { background: #e9ecef; border-bottom-left-radius: 0; }
+        .error { background: #ffdddd; color: #cc0000; font-size: 0.9em; }
+        .emergency { background: #ff4444; color: white; font-weight: bold; }
+        .meta { font-size: 0.75em; color: #666; margin-top: 4px; font-style: italic; }
+        #input-container { display: flex; gap: 10px; }
+        #message-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        #send-btn { padding: 10px 25px; background: #2196F3; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h2 style="text-align: center; color: #333;">Diabetes AI Health Assistant</h2>
+    <div id="chat-container">
+        <div class="message bot">Halo! Saya AI Health Assistant untuk diabetes. Saya bisa membantu menjelaskan tentang diabetes, gejala, perawatan, dan gaya hidup sehat. Ada yang bisa saya bantu?</div>
+    </div>
+    <div id="input-container">
+        <input type="text" id="message-input" placeholder="Ketik pertanyaan Anda..." autocomplete="off">
+        <button id="send-btn" onclick="sendMessage()">Kirim</button>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const sessionId = 'diabetes-session-' + Math.random().toString(36).substr(2, 9);
+
+        messageInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") sendMessage();
+        });
+
+        function appendMessage(text, sender, meta = "") {
+            const div = document.createElement('div');
+            div.className = 'message ' + sender;
+            div.innerText = text;
+            if (meta) {
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'meta';
+                metaDiv.innerText = meta;
+                div.appendChild(metaDiv);
+            }
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            appendMessage(message, 'user');
+            messageInput.value = '';
+            sendBtn.disabled = true;
+            sendBtn.innerText = 'Memproses...';
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        message: message
+                    })
+                });
+
+                if (!response.ok) throw new Error('Server error');
+                
+                const data = await response.json();
+                
+                appendMessage(data.response_text, 'bot');
+                
+                // Debug info
+                let debugInfo = "Intent: " + data.intent;
+                if (data.extracted_entities && data.extracted_entities.diabetes_status) {
+                    debugInfo += " | Status: " + data.extracted_entities.diabetes_status;
+                }
+                appendMessage("", 'bot', debugInfo);
+
+                // Red flag warning
+                if (data.red_flags && data.red_flags.length > 0) {
+                    appendMessage("PERINGATAN: " + data.red_flags.join(', ') + ". Segera cari pertolongan medis!", 'emergency');
+                }
+
+            } catch (error) {
+                appendMessage('Maaf, gagal terhubung ke server. Pastikan server FastAPI menyala.', 'error');
+                console.error(error);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.innerText = 'Kirim';
+                messageInput.focus();
+            }
+        }
+    </script>
+</body>
+</html>
