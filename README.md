@@ -1,8 +1,6 @@
 # Telehealth AI Microservice (Diabetes Care Focus)
 
-AI Agent Microservice khusus penderita diabetes berbasis **Python 3.10**, **FastAPI**, **Groq API (Multi-Model Round-Robin Fallback)**, **Multi-Agent Architecture**, dan **RAG (Retrieval-Augmented Generation)** yang terintegrasi dengan **Supabase `pgvector`**.
-
-Service ini dirancang untuk mendampingi penderita diabetes mengenai pemantauan kadar gula darah, pertolongan pertama hipoglikemia/hiperglikemia, manajemen nutrisi rendah indeks glikemik (Low GI), serta panduan penggunaan alat medis (glucometer & strip tes).
+AI Agent Microservice khusus penderita diabetes
 
 ---
 
@@ -12,23 +10,10 @@ Service ini dirancang untuk mendampingi penderita diabetes mengenai pemantauan k
 - FastAPI `0.110+`
 - Uvicorn `0.28+`
 - Groq API (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it`) dengan strategi **Round-Robin Fallback**
-- OpenAI API (`text-embedding-3-small` untuk Vector Search)
+- SentenceTransformers (`all-MiniLM-L6-v2` - Gratis/Lokal untuk Vector Search)
 - Supabase `pgvector` (Vector Database)
 - Pydantic & Pydantic Settings `2.6+`
 - Docker & Docker Compose
-
----
-
-## Strategi Multi-Model Groq (Round-Robin Fallback)
-
-Untuk menjamin layanan AI selalu aktif tanpa hambatan kuota (*rate limit*), service ini menggunakan **Groq API** dengan hirarki pengalihan otomatis (*fallback*):
-
-1. **`llama-3.3-70b-versatile`** (Model Utama - Kualitas Tertinggi)
-2. **`llama-3.1-8b-instant`** (Fallback 1 - Kecepatan Tinggi)
-3. **`mixtral-8x7b-32768`** (Fallback 2 - Konteks Panjang)
-4. **`gemma2-9b-it`** (Fallback 3 - Cadangan)
-
-*Jika model utama mencapai limit (HTTP 429 Rate Limit), sistem secara otomatis mengalihkan komputasi ke model berikutnya tanpa membuat pengguna merasa gagal.*
 
 ---
 
@@ -51,7 +36,7 @@ docker compose version
 
 1. Masuk ke direktori proyek:
    ```bash
-   cd telehealth-ai
+   cd telehealth-AI-Engineer
    ```
 
 2. Salin file konfigurasi environment:
@@ -81,7 +66,7 @@ Service AI siap diakses pada **`http://localhost:8000`**.
 | `NODE_ENV` | `development` | Mode lingkungan (`development` / `production`) |
 | `X_AI_API_KEY` | `telehealth_ai_secret_key_dev` | Secret Key untuk autentikasi internal dari Backend Bun |
 | `GROQ_API_KEY` | `gsk_...` | API Key Groq untuk komputasi cepat LLM & Fallback |
-| `OPENAI_API_KEY` | `sk-...` | API Key OpenAI untuk Vector Embeddings |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Model Local Embedding Gratis (SentenceTransformers) |
 | `SUPABASE_URL` | `https://...supabase.co` | URL proyek Supabase |
 | `SUPABASE_KEY` | `ey...` | API Key / Anon Key Supabase untuk akses `pgvector` |
 

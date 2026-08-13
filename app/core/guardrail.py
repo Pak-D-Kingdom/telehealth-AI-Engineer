@@ -6,7 +6,7 @@ class MedicalGuardrail:
     )
 
     FORBIDDEN_KEYWORDS = [
-        "uubah dosis", "ganti obat resep", "hentikan minum obat", "resepkan obat"
+        "ubah dosis", "ganti obat resep", "hentikan minum obat", "resepkan obat"
     ]
 
     def apply_guardrail(self, response_text: str) -> tuple[str, bool]:

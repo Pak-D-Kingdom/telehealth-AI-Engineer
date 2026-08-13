@@ -16,9 +16,8 @@ class Settings(BaseSettings):
         "gemma2-9b-it"
     ]
 
-    # OpenAI Embedding Model for Vector Search
-    OPENAI_API_KEY: str = ""
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    # Free Local Embedding Model for Vector Search (SentenceTransformers)
+    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
     # Supabase Settings
     SUPABASE_URL: str = ""

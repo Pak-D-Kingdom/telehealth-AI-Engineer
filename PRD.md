@@ -2,7 +2,7 @@
 
 **Project Name:** `telehealth-ai`  
 **Tech Stack:** Python 3.10+, FastAPI, Uvicorn, Pydantic, Groq API (Multi-Model Round-Robin), Supabase (pgvector), Docker, Docker Compose  
-**LLM Providers:** Groq API (Primary: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it` with automatic Rate-Limit Fallback) & OpenAI API  
+**LLM & Embedding Providers:** Groq API (Primary: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it` with automatic Rate-Limit Fallback) & SentenceTransformers (Free Local Embedding: `all-MiniLM-L6-v2`)  
 **Primary Domain Focus:** Diabetes Care & Lifestyle Management Platform (GlucoCare)  
 **Integration Target:** `telehealth-backend` (Bun/Express) & `telehealth-frontend` (Next.js)  
 
@@ -23,24 +23,31 @@
 
 ## 2. Architecture & Design Patterns
 
-### 2.1 Groq Multi-Model Round-Robin Fallback Architecture
+### System Integration Architecture (Frontend - Backend - AI Microservice)
+
+```text
+┌─────────────────────────┐        HTTP / REST        ┌─────────────────────────┐        Internal REST        ┌─────────────────────────┐
+│   telehealth-frontend   │ ────────────────────────> │   telehealth-backend    │ ────────────────────────> │      telehealth-ai      │
+│        (Next.js)        │  User Auth & Chat Input   │      (Bun / Express)    │  Header: X-AI-API-KEY   │   (FastAPI Microservice)│
+└─────────────────────────┘                           └─────────────────────────┘                             └────────────┬────────────┘
+                                                                                                                           │
+                                                                                                     ┌─────────────────────┴─────────────────────┐
+                                                                                                     │                                           │
+                                                                                                     ▼                                           ▼
+                                                                                        ┌─────────────────────────┐                 ┌─────────────────────────┐
+                                                                                        │    Supabase pgvector    │                 │      Groq LLM API       │
+                                                                                        │    (Knowledge Base)     │                 │   (Round-Robin Models)   │
+                                                                                        └─────────────────────────┘                 └─────────────────────────┘
 ```
-                                                ┌─────────────────────────────┐
-                                                │ llama-3.3-70b-versatile     │ (Primary)
-                                                └──────────────┬──────────────┘
-                                                               │ (If Rate Limited / 429)
-                                                ┌──────────────▼──────────────┐
-                                                │ llama-3.1-8b-instant        │ (Fallback 1)
-                                                └──────────────┬──────────────┘
-                                                               │ (If Rate Limited)
-                                                ┌──────────────▼──────────────┐
-                                                │ mixtral-8x7b-32768          │ (Fallback 2)
-                                                └──────────────┬──────────────┘
-                                                               │ (If Rate Limited)
-                                                ┌──────────────▼──────────────┐
-                                                │ gemma2-9b-it                │ (Fallback 3)
-                                                └─────────────────────────────┘
-```
+
+**Penjelasan Alur Integrasi:**
+1. **Frontend (`telehealth-frontend` - Next.js):** Pengguna (pasien diabetes) mengirim pesan atau pertanyaan konsultasi melalui antarmuka chat.
+2. **Backend API Gateway (`telehealth-backend` - Bun/Express):** Mengatur autentikasi user, manajemen sesi, serta meneruskan payload request ke `telehealth-ai` menggunakan header autentikasi internal `X-AI-API-KEY`.
+3. **AI Microservice (`telehealth-ai` - FastAPI):** 
+   - Menerima request di endpoint `/api/v1/customer/chat`.
+   - Mengambil dokumen rujukan medis terkait dari **Supabase `pgvector`** (RAG).
+   - Mengirim konteks + prompt ke **Groq API** (menggunakan alur Fallback Multi-Model).
+   - Memasukkan *Medical Disclaimer* & menyaring jawaban lewat **Guardrail** sebelum mengembalikan respon ke Backend.
 
 ---
 
@@ -70,7 +77,7 @@ telehealth-ai/
     ├── core/                         # 🛡️ SHARED CORE UTILITIES
     │   ├── __init__.py
     │   ├── llm.py                    # Unified Groq API Interface dengan Round-Robin Model Fallback
-    │   ├── embeddings.py             # Vector Embeddings Generator (text-embedding-3)
+    │   ├── embeddings.py             # Vector Embeddings Generator (SentenceTransformers all-MiniLM-L6-v2)
     │   └── guardrail.py              # Safety Guardrails (Diabetes Medical disclaimer & filter)
     │
     ├── services/                     # ⚙️ RAG & VECTOR STORAGE (SUPABASE)
