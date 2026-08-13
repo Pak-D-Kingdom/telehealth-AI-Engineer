@@ -49,6 +49,7 @@ export interface AdminChatMessage {
   id: string;
   role: "USER" | "ASSISTANT";
   content: string;
+  sources: Array<{ title: string; source: string }> | null;
   createdAt: string;
 }
 

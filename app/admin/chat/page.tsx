@@ -316,6 +316,11 @@ export default function AdminChatPage() {
                   <div key={message.id} className={message.role === "USER" ? "flex justify-end" : "flex justify-start"}>
                     <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === "USER" ? "rounded-tr-sm bg-[#0D5C46] text-white" : "rounded-tl-sm border border-[#EAE4DC] bg-white text-[#1A2421]"}`}>
                       <p className="whitespace-pre-line">{message.content}</p>
+                      {message.sources && message.sources.length > 0 && (
+                        <p className="mt-2 border-t border-[#EAE4DC] pt-2 text-[10px] text-[#6B7C72]">
+                          Sumber: {message.sources.map((source) => source.title).join(", ")}
+                        </p>
+                      )}
                       <time className={`mt-2 block text-[9px] ${message.role === "USER" ? "text-white/60" : "text-[#8A978F]"}`}>{formatDate(message.createdAt)}</time>
                     </div>
                   </div>
