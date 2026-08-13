@@ -134,6 +134,7 @@ model ChatMessage {
   sessionId String          @map("session_id") @db.Uuid
   role      ChatMessageRole
   content   String
+  sources   Json?           @db.JsonB
   session   ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   createdAt DateTime        @default(now()) @map("created_at")
 

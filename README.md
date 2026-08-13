@@ -99,6 +99,13 @@ Respons ketika API dan database siap:
 | `DATABASE_URL`      | `postgresql://...`           | URL koneksi yang digunakan Prisma               |
 | `FRONTEND_URL`      | `http://localhost:3000`      | Origin frontend yang diizinkan oleh CORS        |
 | `SESSION_TTL_DAYS`  | `7`                          | Masa berlaku session admin dalam hari           |
+| `CHAT_SESSION_TTL_DAYS` | `30`                     | Masa berlaku session chatbot dalam hari         |
+| `GROQ_API_KEY`      | -                            | API key Groq untuk jawaban dan ekstraksi lead   |
+| `GROQ_CHAT_MODEL`   | `llama-3.3-70b-versatile`    | Model utama chatbot                             |
+| `GROQ_EXTRACTION_MODEL` | `llama-3.1-8b-instant` | Model ekstraksi data lead                       |
+| `GEMINI_API_KEY`    | -                            | API key Gemini untuk embedding knowledge base   |
+| `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` | Model embedding knowledge base                  |
+| `AI_REQUEST_TIMEOUT_MS` | `30000`                  | Batas waktu request provider AI                 |
 | `ADMIN_NAME`        | `Telehealth Admin`           | Nama admin yang dibuat oleh seed                |
 | `ADMIN_EMAIL`       | `admin@glucocare.id`         | Email login admin development                   |
 | `ADMIN_PASSWORD`    | `change-this-local-password` | Password admin development, minimal 12 karakter |
@@ -116,6 +123,8 @@ Schema Prisma berada di `prisma/schema.prisma` dan migration berada di `prisma/m
 - Dokter
 - Kategori dokter
 - Relasi dokter dan kategori
+- Session, pesan, dan lead chatbot
+- Knowledge base dengan embedding pgvector
 
 Setelah menambahkan atau mengubah model, buat migration dengan:
 
@@ -183,6 +192,21 @@ Endpoint publik:
 | `GET`  | `/api/doctors`              | Daftar dokter aktif                      |
 | `GET`  | `/api/doctors/:identifier`  | Detail dokter berdasarkan UUID atau slug |
 | `GET`  | `/api/doctor-categories`    | Daftar kategori dokter                   |
+
+Endpoint chatbot publik (menggunakan cookie session HTTP-only):
+
+| Method   | Endpoint                 | Keterangan                                      |
+| -------- | ------------------------ | ----------------------------------------------- |
+| `GET`    | `/api/chat`              | Riwayat percakapan aktif beserta sumber jawaban |
+| `POST`   | `/api/chat`              | Mengirim pesan dengan respons JSON              |
+| `POST`   | `/api/chat/stream`       | Mengirim pesan dengan respons SSE streaming     |
+| `POST`   | `/api/chat/retry`        | Mencoba ulang pesan terakhir via JSON            |
+| `POST`   | `/api/chat/retry/stream` | Mencoba ulang pesan terakhir via SSE             |
+| `GET`    | `/api/chat/status`       | Status provider dan jeda pemulihan kuota        |
+| `DELETE` | `/api/chat`              | Menutup session untuk percakapan baru            |
+
+Event SSE yang dikirim adalah `meta`, `token`, `done`, atau `error`. Event `meta` dan `done`
+menyertakan referensi knowledge base yang digunakan.
 
 Endpoint autentikasi:
 

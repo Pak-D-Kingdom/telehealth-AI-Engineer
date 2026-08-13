@@ -69,7 +69,7 @@ export async function getAdminChatSession(id: string) {
       messages: {
         orderBy: { createdAt: "asc" },
         take: 200,
-        select: { id: true, role: true, content: true, createdAt: true },
+        select: { id: true, role: true, content: true, sources: true, createdAt: true },
       },
       _count: { select: { messages: true } },
     },

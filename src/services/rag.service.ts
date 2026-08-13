@@ -20,6 +20,7 @@ const geminiErrorSchema = z.object({
 interface KnowledgeMatch {
   title: string;
   content: string;
+  source: string;
   similarity: number;
 }
 
@@ -111,6 +112,7 @@ export async function retrieveRelevantContext(query: string, limit = 3) {
       SELECT
         "title",
         "content",
+        "source",
         1 - ("embedding" <=> ${vector}::vector) AS "similarity"
       FROM "knowledge_base"
       WHERE 1 - ("embedding" <=> ${vector}::vector) > 0.3
@@ -118,7 +120,7 @@ export async function retrieveRelevantContext(query: string, limit = 3) {
       LIMIT ${limit}
     `;
 
-    return matches.map(({ title, content }) => ({ title, content }));
+    return matches.map(({ title, content, source }) => ({ title, content, source }));
   } catch (error) {
     console.error("RAG tidak tersedia; percakapan dilanjutkan tanpa konteks.", error);
     return [];

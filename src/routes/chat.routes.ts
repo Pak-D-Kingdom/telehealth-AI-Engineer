@@ -5,7 +5,11 @@ import {
   currentHistory,
   endSession,
   historyBySessionId,
+  providerStatus,
+  retryMessage,
+  retryMessageStream,
   sendMessage,
+  sendMessageStream,
 } from "../controllers/chat.controller";
 import { env } from "../config/env";
 import { CHAT_SESSION_COOKIE_NAME } from "../utils/chat-session";
@@ -34,7 +38,11 @@ const chatLimiter = rateLimit({
 });
 
 router.get("/", currentHistory);
+router.get("/status", providerStatus);
 router.post("/", chatLimiter, sendMessage);
+router.post("/stream", chatLimiter, sendMessageStream);
+router.post("/retry", chatLimiter, retryMessage);
+router.post("/retry/stream", chatLimiter, retryMessageStream);
 router.delete("/", endSession);
 router.get("/:sessionId", historyBySessionId);
 

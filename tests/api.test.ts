@@ -119,6 +119,14 @@ describe("Telehealth API", () => {
   });
 
   test("chat membuat sesi aman, menangani kondisi darurat, dan melindungi histori", async () => {
+    const providerStatusResponse = await apiRequest("/api/chat/status");
+    const providerStatusBody = (await providerStatusResponse.json()) as {
+      data: { provider: string; status: string };
+    };
+    expect(providerStatusResponse.status).toBe(200);
+    expect(providerStatusBody.data.provider).toBe("groq");
+    expect(["READY", "NOT_CONFIGURED"]).toContain(providerStatusBody.data.status);
+
     const missingHistoryResponse = await apiRequest("/api/chat");
     expect(missingHistoryResponse.status).toBe(401);
 
@@ -138,22 +146,55 @@ describe("Telehealth API", () => {
         reply: string;
         leadComplete: boolean;
         isEmergency: boolean;
+        sources: unknown[];
       };
     };
     expect(emergencyResponse.status).toBe(200);
     expect(emergencyBody.data.isEmergency).toBe(true);
     expect(emergencyBody.data.reply).toContain("119");
+    expect(emergencyBody.data.sources).toEqual([]);
     createdChatSessionId = emergencyBody.data.sessionId;
     chatCookie = emergencyResponse.headers.get("set-cookie")?.split(";", 1)[0] ?? "";
     expect(chatCookie).toStartWith("telehealth_chat_session=");
 
     const historyResponse = await apiRequest(`/api/chat/${createdChatSessionId}`);
     const historyBody = (await historyResponse.json()) as {
-      data: { messages: Array<{ role: string; content: string }> };
+      data: { messages: Array<{ id: string; role: string; content: string; sources: unknown[] }> };
     };
     expect(historyResponse.status).toBe(200);
     expect(historyBody.data.messages).toHaveLength(2);
     expect(historyBody.data.messages[1]?.role).toBe("assistant");
+    expect(historyBody.data.messages[1]?.sources).toEqual([]);
+
+    await prisma.chatMessage.update({
+      where: { id: historyBody.data.messages[1]!.id },
+      data: { sources: [{ title: "Knowledge Integration Test", source: testKnowledgeSource }] },
+    });
+    const sourcedHistoryResponse = await apiRequest("/api/chat");
+    const sourcedHistoryBody = (await sourcedHistoryResponse.json()) as {
+      data: { messages: Array<{ sources: Array<{ title: string; source: string }> }> };
+    };
+    expect(sourcedHistoryBody.data.messages[1]?.sources).toEqual([
+      { title: "Knowledge Integration Test", source: testKnowledgeSource },
+    ]);
+
+    const streamResponse = await apiRequest("/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Pasien diabetes tidak sadar dan sulit bernapas." }),
+    });
+    const streamBody = await streamResponse.text();
+    expect(streamResponse.status).toBe(200);
+    expect(streamResponse.headers.get("content-type")).toContain("text/event-stream");
+    expect(streamBody).toContain("event: meta");
+    expect(streamBody).toContain("event: token");
+    expect(streamBody).toContain("event: done");
+    expect(streamBody).toContain("119");
+
+    const retryResponse = await apiRequest("/api/chat/retry", { method: "POST" });
+    expect(retryResponse.status).toBe(409);
+    expect(await retryResponse.json()).toMatchObject({
+      error: { code: "CHAT_NOT_RETRYABLE" },
+    });
 
     const foreignHistoryResponse = await apiRequest(`/api/chat/${randomUUID()}`);
     expect(foreignHistoryResponse.status).toBe(403);
@@ -202,7 +243,7 @@ describe("Telehealth API", () => {
     expect(
       emergencySessionsBody.data.some(
         (session) =>
-          session.id === createdChatSessionId && session.isEmergency && session.messageCount === 2,
+          session.id === createdChatSessionId && session.isEmergency && session.messageCount === 4,
       ),
     ).toBe(true);
 
@@ -211,7 +252,7 @@ describe("Telehealth API", () => {
       data: { messages: unknown[]; status: string; lead: { qualificationStatus: string } | null };
     };
     expect(chatDetailResponse.status).toBe(200);
-    expect(chatDetailBody.data.messages).toHaveLength(2);
+    expect(chatDetailBody.data.messages).toHaveLength(4);
 
     const updateChatResponse = await apiRequest(`/api/admin/chat/sessions/${createdChatSessionId}`, {
       method: "PATCH",

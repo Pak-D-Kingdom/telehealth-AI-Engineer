@@ -20,7 +20,7 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof AppError) {
     const retryAfterSeconds = readRetryAfterSeconds(error.details);
-    if (error.code === "AI_RATE_LIMITED" && retryAfterSeconds) {
+    if (retryAfterSeconds) {
       res.setHeader("Retry-After", retryAfterSeconds.toString());
     }
 
