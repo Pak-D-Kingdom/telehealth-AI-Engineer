@@ -159,13 +159,15 @@ model ChatLead {
 }
 
 model KnowledgeBase {
-  id        String                @id @default(uuid()) @db.Uuid
-  title     String                @db.VarChar(240)
-  content   String
-  embedding Unsupported("vector(3072)")
-  source    String                @unique @db.VarChar(240)
-  createdAt DateTime              @default(now()) @map("created_at")
-  updatedAt DateTime              @updatedAt @map("updated_at")
+  id         String                 @id @default(uuid()) @db.Uuid
+  title      String                 @db.VarChar(240)
+  content    String
+  embedding  Unsupported("vector(3072)")
+  source     String                 @db.VarChar(240)
+  chunkIndex Int                    @default(0) @map("chunk_index")
+  createdAt  DateTime               @default(now()) @map("created_at")
+  updatedAt  DateTime               @updatedAt @map("updated_at")
 
+  @@unique([source, chunkIndex])
   @@map("knowledge_base")
 }

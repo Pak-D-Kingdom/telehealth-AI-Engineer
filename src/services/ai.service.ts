@@ -29,34 +29,37 @@ interface ModelHealth {
 }
 
 const PROVIDER_UNAVAILABLE_COOLDOWN_MS = 60_000;
-const PROVIDER_AUTH_COOLDOWN_MS = 5 * 60_000;
 const modelHealth = new Map<string, ModelHealth>();
 
-const groqResponseSchema = z.object({
-  choices: z.array(
-    z.object({
-      message: z.object({ content: z.string().min(1) }),
-    }),
-  ).min(1),
-});
+/**
+ * Returns all configured Groq API keys and OpenRouter API keys from process.env
+ */
+function getAllApiKeys(): { groqKeys: string[]; openRouterKeys: string[] } {
+  const groqKeys: string[] = [];
+  const openRouterKeys: string[] = [];
 
-const groqStreamChunkSchema = z.object({
-  choices: z.array(
-    z.object({
-      delta: z.object({ content: z.string().nullable().optional() }),
-    }),
-  ),
-});
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!value || typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed.startsWith("gsk_") && !groqKeys.includes(trimmed)) {
+      groqKeys.push(trimmed);
+    } else if (trimmed.startsWith("sk-or-v1-") && !openRouterKeys.includes(trimmed)) {
+      openRouterKeys.push(trimmed);
+    }
+  }
 
-const groqErrorSchema = z.object({
-  error: z.object({
-    code: z.string().optional(),
-    type: z.string().optional(),
-  }),
-});
+  if (groqKeys.length === 0 && env.GROQ_API_KEY) {
+    groqKeys.push(env.GROQ_API_KEY);
+  }
+
+  return { groqKeys, openRouterKeys };
+}
+
+let currentGroqKeyIndex = 0;
 
 export function getAIProviderStatus(model = env.GROQ_CHAT_MODEL): AIProviderStatus {
-  if (!env.GROQ_API_KEY) {
+  const { groqKeys } = getAllApiKeys();
+  if (groqKeys.length === 0) {
     return { provider: "groq", model, status: "NOT_CONFIGURED" };
   }
 
@@ -68,20 +71,99 @@ export function getAIProviderStatus(model = env.GROQ_CHAT_MODEL): AIProviderStat
       provider: "groq",
       model,
       status: "RATE_LIMITED",
-      retryAfterSeconds: toRetryAfterSeconds(health.rateLimitedUntil - now),
-    };
-  }
-
-  if (health.unavailableUntil > now) {
-    return {
-      provider: "groq",
-      model,
-      status: "UNAVAILABLE",
-      retryAfterSeconds: toRetryAfterSeconds(health.unavailableUntil - now),
+      retryAfterSeconds: Math.max(1, Math.ceil((health.rateLimitedUntil - now) / 1000)),
     };
   }
 
   return { provider: "groq", model, status: "READY" };
+}
+
+/**
+ * Executes an LLM completion with automatic multi-key rotation (Groq key 1..N -> OpenRouter)
+ */
+async function callLLMWithRotation(
+  messages: Array<{ role: string; content: string | null; tool_calls?: any }>,
+  model: string = env.GROQ_CHAT_MODEL,
+  options: CompletionOptions = {},
+): Promise<any> {
+  const { groqKeys, openRouterKeys } = getAllApiKeys();
+  const totalGroq = groqKeys.length;
+
+  if (totalGroq === 0 && openRouterKeys.length === 0) {
+    throw new AppError(503, "CHATBOT_NOT_CONFIGURED", "Layanan AI belum dikonfigurasi.");
+  }
+
+  // 1. Try Groq Keys via Rotation
+  for (let i = 0; i < totalGroq; i++) {
+    const keyIndex = (currentGroqKeyIndex + i) % totalGroq;
+    const apiKey = groqKeys[keyIndex]!;
+
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          max_tokens: options.maxTokens ?? 512,
+          temperature: options.temperature ?? 0.2,
+          ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
+        }),
+      });
+
+      if (response.status === 429) {
+        console.warn(`[Key Rotation] Groq key index ${keyIndex} rate limited (429). Rotating...`);
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Key Rotation] Groq key index ${keyIndex} failed (${response.status}):`, errorText);
+        if (response.status >= 500) continue;
+        throw new Error(`Groq API error: ${response.status} ${errorText}`);
+      }
+
+      // Success - update active key index
+      currentGroqKeyIndex = (keyIndex + 1) % totalGroq;
+      markModelReady(model);
+      return await response.json();
+    } catch (err: any) {
+      if (err.message?.includes("Groq API error")) throw err;
+      console.warn(`[Key Rotation] Network error with key index ${keyIndex}:`, err.message);
+    }
+  }
+
+  // 2. OpenRouter Fallback
+  if (openRouterKeys.length > 0) {
+    console.log("[Key Rotation] All Groq keys exhausted. Attempting OpenRouter fallback...");
+    for (const openRouterKey of openRouterKeys) {
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openRouterKey}`,
+          },
+          body: JSON.stringify({
+            model: "meta-llama/llama-3.3-70b-instruct",
+            messages,
+            max_tokens: options.maxTokens ?? 512,
+          }),
+        });
+
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (err) {
+        console.error("[Key Rotation] OpenRouter attempt failed:", err);
+      }
+    }
+  }
+
+  throw new AppError(503, "AI_RATE_LIMITED", "Layanan AI sedang mencapai batas penggunaan. Mohon coba lagi beberapa saat.");
 }
 
 export async function sendChatCompletion(
@@ -90,32 +172,18 @@ export async function sendChatCompletion(
   options: CompletionOptions = {},
 ) {
   const model = options.model ?? env.GROQ_CHAT_MODEL;
-  assertProviderAvailable(model);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), env.AI_REQUEST_TIMEOUT_MS);
+  const payloadMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
   try {
-    const response = await fetchCompletion(messages, systemPrompt, model, options, false, controller);
-
-    if (!response.ok) {
-      throw await createProviderError(response, model);
+    const data = await callLLMWithRotation(payloadMessages, model, options);
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new AppError(502, "INVALID_AI_RESPONSE", "Layanan AI mengembalikan respons kosong.");
     }
-
-    markModelReady(model);
-    const result = groqResponseSchema.safeParse(await response.json());
-    if (!result.success) {
-      throw new AppError(
-        502,
-        "INVALID_AI_RESPONSE",
-        "Layanan AI mengembalikan respons yang tidak valid.",
-      );
-    }
-
-    return result.data.choices[0]!.message.content.trim();
+    return content.trim();
   } catch (error) {
-    throw normalizeProviderError(error, model);
-  } finally {
-    clearTimeout(timeout);
+    if (error instanceof AppError) throw error;
+    throw new AppError(502, "AI_PROVIDER_ERROR", `Layanan AI bermasalah: ${(error as any).message || error}`);
   }
 }
 
@@ -125,173 +193,42 @@ export async function* streamChatCompletion(
   options: CompletionOptions = {},
 ) {
   const model = options.model ?? env.GROQ_CHAT_MODEL;
-  assertProviderAvailable(model);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), env.AI_REQUEST_TIMEOUT_MS);
+  const { groqKeys } = getAllApiKeys();
+  const apiKey = groqKeys[currentGroqKeyIndex] || env.GROQ_API_KEY;
 
-  try {
-    const response = await fetchCompletion(messages, systemPrompt, model, options, true, controller);
-
-    if (!response.ok) {
-      throw await createProviderError(response, model);
-    }
-
-    if (!response.body) {
-      throw new AppError(
-        502,
-        "INVALID_AI_RESPONSE",
-        "Layanan AI tidak mengembalikan stream respons.",
-      );
-    }
-
-    markModelReady(model);
-    for await (const data of readServerSentEvents(response.body)) {
-      if (data === "[DONE]") return;
-
-      let parsedJson: unknown;
-      try {
-        parsedJson = JSON.parse(data);
-      } catch {
-        throw new AppError(
-          502,
-          "INVALID_AI_RESPONSE",
-          "Layanan AI mengembalikan stream yang tidak valid.",
-        );
-      }
-
-      const chunk = groqStreamChunkSchema.safeParse(parsedJson);
-      if (!chunk.success) {
-        throw new AppError(
-          502,
-          "INVALID_AI_RESPONSE",
-          "Layanan AI mengembalikan stream yang tidak valid.",
-        );
-      }
-
-      const content = chunk.data.choices[0]?.delta.content;
-      if (content) yield content;
-    }
-  } catch (error) {
-    throw normalizeProviderError(error, model);
-  } finally {
-    clearTimeout(timeout);
+  if (!apiKey) {
+    throw new AppError(503, "CHATBOT_NOT_CONFIGURED", "Layanan chatbot belum dikonfigurasi.");
   }
-}
 
-async function fetchCompletion(
-  messages: ChatCompletionMessage[],
-  systemPrompt: string,
-  model: string,
-  options: CompletionOptions,
-  stream: boolean,
-  controller: AbortController,
-) {
-  return fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.GROQ_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model,
       messages: [{ role: "system", content: systemPrompt }, ...messages],
       max_tokens: options.maxTokens ?? 512,
       temperature: options.temperature ?? 0.2,
-      stream,
-      ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
+      stream: true,
     }),
-    signal: controller.signal,
   });
-}
 
-async function createProviderError(response: Response, model: string) {
-  const errorBody = groqErrorSchema.safeParse(await response.json().catch(() => undefined));
-  const providerCode = errorBody.success
-    ? (errorBody.data.error.code ?? errorBody.data.error.type)
-    : undefined;
-  console.error(
-    `Groq API gagal dengan status ${response.status}${providerCode ? ` (${providerCode})` : ""}.`,
-  );
-
-  if (response.status === 429) {
-    const retryAfterSeconds = parseRetryAfter(response.headers.get("retry-after")) ?? 60;
-    getModelHealth(model).rateLimitedUntil = Date.now() + retryAfterSeconds * 1_000;
-    return new AppError(
-      503,
-      "AI_RATE_LIMITED",
-      "Layanan AI sedang mencapai batas penggunaan. Silakan coba lagi beberapa saat.",
-      { retryAfterSeconds },
-    );
+  if (!response.ok || !response.body) {
+    throw new AppError(502, "INVALID_AI_RESPONSE", "Stream AI gagal diinisialisasi.");
   }
 
-  if (response.status === 401 || response.status === 403) {
-    getModelHealth(model).unavailableUntil = Date.now() + PROVIDER_AUTH_COOLDOWN_MS;
-    return new AppError(
-      503,
-      "AI_PROVIDER_AUTH_ERROR",
-      "Konfigurasi layanan AI ditolak oleh provider. Hubungi administrator.",
-      { retryAfterSeconds: toRetryAfterSeconds(PROVIDER_AUTH_COOLDOWN_MS) },
-    );
+  for await (const data of readServerSentEvents(response.body)) {
+    if (data === "[DONE]") return;
+    try {
+      const parsed = JSON.parse(data);
+      const content = parsed.choices?.[0]?.delta?.content;
+      if (content) yield content;
+    } catch {
+      // ignore parse errors in chunk
+    }
   }
-
-  markModelUnavailable(model);
-  return new AppError(
-    502,
-    "AI_PROVIDER_ERROR",
-    "Layanan AI sedang tidak tersedia. Silakan coba kembali.",
-    { retryAfterSeconds: toRetryAfterSeconds(PROVIDER_UNAVAILABLE_COOLDOWN_MS) },
-  );
-}
-
-function assertProviderAvailable(model: string) {
-  const status = getAIProviderStatus(model);
-
-  if (status.status === "NOT_CONFIGURED") {
-    throw new AppError(
-      503,
-      "CHATBOT_NOT_CONFIGURED",
-      "Layanan chatbot belum dikonfigurasi. Hubungi administrator.",
-    );
-  }
-
-  if (status.status === "RATE_LIMITED") {
-    throw new AppError(
-      503,
-      "AI_RATE_LIMITED",
-      "Layanan AI sedang mencapai batas penggunaan. Silakan coba lagi beberapa saat.",
-      { retryAfterSeconds: status.retryAfterSeconds },
-    );
-  }
-
-  if (status.status === "UNAVAILABLE") {
-    throw new AppError(
-      503,
-      "AI_PROVIDER_UNAVAILABLE",
-      "Layanan AI sedang tidak tersedia. Silakan coba kembali.",
-      { retryAfterSeconds: status.retryAfterSeconds },
-    );
-  }
-}
-
-function normalizeProviderError(error: unknown, model: string) {
-  if (error instanceof AppError) return error;
-
-  markModelUnavailable(model);
-  if (error instanceof Error && error.name === "AbortError") {
-    return new AppError(
-      504,
-      "AI_TIMEOUT",
-      "Layanan AI terlalu lama merespons.",
-      { retryAfterSeconds: toRetryAfterSeconds(PROVIDER_UNAVAILABLE_COOLDOWN_MS) },
-    );
-  }
-
-  return new AppError(
-    502,
-    "AI_PROVIDER_ERROR",
-    "Layanan AI sedang tidak tersedia. Silakan coba kembali.",
-    { retryAfterSeconds: toRetryAfterSeconds(PROVIDER_UNAVAILABLE_COOLDOWN_MS) },
-  );
 }
 
 async function* readServerSentEvents(stream: ReadableStream<Uint8Array>) {
@@ -318,13 +255,6 @@ async function* readServerSentEvents(stream: ReadableStream<Uint8Array>) {
 
       if (done) break;
     }
-
-    const data = buffer
-      .split("\n")
-      .filter((line) => line.startsWith("data:"))
-      .map((line) => line.slice(5).trimStart())
-      .join("\n");
-    if (data) yield data;
   } finally {
     reader.releaseLock();
   }
@@ -342,22 +272,4 @@ function markModelReady(model: string) {
   const health = getModelHealth(model);
   health.rateLimitedUntil = 0;
   health.unavailableUntil = 0;
-}
-
-function markModelUnavailable(model: string) {
-  getModelHealth(model).unavailableUntil = Date.now() + PROVIDER_UNAVAILABLE_COOLDOWN_MS;
-}
-
-function parseRetryAfter(value: string | null) {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds);
-
-  const timestamp = Date.parse(value);
-  if (Number.isNaN(timestamp)) return undefined;
-  return Math.max(1, Math.ceil((timestamp - Date.now()) / 1_000));
-}
-
-function toRetryAfterSeconds(milliseconds: number) {
-  return Math.max(1, Math.ceil(milliseconds / 1_000));
 }

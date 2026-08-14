@@ -102,21 +102,54 @@ export async function generateEmbedding(text: string, options: EmbeddingOptions 
   }
 }
 
-export async function retrieveRelevantContext(query: string, limit = 3) {
+export async function retrieveRelevantContext(query: string, limit = 4) {
   if (!env.GEMINI_API_KEY) return [];
 
   try {
     const embedding = await generateEmbedding(query, { taskType: "RETRIEVAL_QUERY" });
     const vector = serializeVector(embedding);
+    const sanitizedQuery = query.replace(/[^\w\s\u00C0-\u017F-]/g, " ").trim();
+
     const matches = await prisma.$queryRaw<KnowledgeMatch[]>`
-      SELECT
-        "title",
-        "content",
-        "source",
-        1 - ("embedding" <=> ${vector}::vector) AS "similarity"
-      FROM "knowledge_base"
-      WHERE 1 - ("embedding" <=> ${vector}::vector) > 0.3
-      ORDER BY "embedding" <=> ${vector}::vector
+      WITH vector_search AS (
+        SELECT
+          "id",
+          "title",
+          "content",
+          "source",
+          1 - ("embedding" <=> ${vector}::vector) AS "similarity",
+          ROW_NUMBER() OVER (ORDER BY "embedding" <=> ${vector}::vector) AS "rank"
+        FROM "knowledge_base"
+        WHERE 1 - ("embedding" <=> ${vector}::vector) > 0.25
+        LIMIT 20
+      ),
+      text_search AS (
+        SELECT
+          "id",
+          "title",
+          "content",
+          "source",
+          ts_rank(to_tsvector('simple', "title" || ' ' || "content"), plainto_tsquery('simple', ${sanitizedQuery})) AS "rank_score",
+          ROW_NUMBER() OVER (
+            ORDER BY ts_rank(to_tsvector('simple', "title" || ' ' || "content"), plainto_tsquery('simple', ${sanitizedQuery})) DESC
+          ) AS "rank"
+        FROM "knowledge_base"
+        WHERE to_tsvector('simple', "title" || ' ' || "content") @@ plainto_tsquery('simple', ${sanitizedQuery})
+        LIMIT 20
+      ),
+      combined AS (
+        SELECT
+          COALESCE(v."id", t."id") AS "id",
+          COALESCE(v."title", t."title") AS "title",
+          COALESCE(v."content", t."content") AS "content",
+          COALESCE(v."source", t."source") AS "source",
+          COALESCE(1.0 / (60 + v."rank"), 0.0) + COALESCE(1.0 / (60 + t."rank"), 0.0) AS "similarity"
+        FROM vector_search v
+        FULL OUTER JOIN text_search t ON v."id" = t."id"
+      )
+      SELECT "title", "content", "source", "similarity"
+      FROM combined
+      ORDER BY "similarity" DESC
       LIMIT ${limit}
     `;
 
@@ -131,18 +164,20 @@ export async function upsertKnowledgeDocument(input: {
   title: string;
   content: string;
   source: string;
+  chunkIndex?: number;
   embedding: number[];
 }) {
+  const chunkIndex = input.chunkIndex ?? 0;
   const vector = serializeVector(input.embedding);
   await prisma.$executeRaw`
     INSERT INTO "knowledge_base" (
-      "id", "title", "content", "embedding", "source", "created_at", "updated_at"
+      "id", "title", "content", "embedding", "source", "chunk_index", "created_at", "updated_at"
     )
     VALUES (
       gen_random_uuid(), ${input.title}, ${input.content}, ${vector}::vector,
-      ${input.source}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      ${input.source}, ${chunkIndex}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     )
-    ON CONFLICT ("source") DO UPDATE SET
+    ON CONFLICT ("source", "chunk_index") DO UPDATE SET
       "title" = EXCLUDED."title",
       "content" = EXCLUDED."content",
       "embedding" = EXCLUDED."embedding",
