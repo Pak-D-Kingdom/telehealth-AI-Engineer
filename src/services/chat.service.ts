@@ -43,35 +43,50 @@ export interface PreparedChatResponse {
   isEmergency: boolean;
   directReply?: string;
   userMessage: string;
+  isVision?: boolean;
 }
 
 export async function processChatMessage(
   resolved: { sessionId: string; token: string },
   message: string,
+  image?: string,
 ) {
-  // 1. Check Semantic Cache first
-  const cached = getCachedResponse(message, resolved.sessionId);
-  if (cached) {
-    return cached;
+  // 1. Check Semantic Cache first (only if no image)
+  if (!image) {
+    const cached = getCachedResponse(message, resolved.sessionId);
+    if (cached) {
+      return cached;
+    }
   }
 
-  const prepared = await prepareChatMessage(resolved, message);
+  const prepared = await prepareChatMessage(resolved, message, image);
   if (prepared.directReply) return toDirectReply(prepared);
 
-  const reply = await sendChatCompletion(prepared.history, prepared.systemPrompt);
+  const reply = await sendChatCompletion(prepared.history, prepared.systemPrompt, {
+    isVision: prepared.isVision,
+  });
   return finalizeChatResponse(prepared, reply);
 }
 
 export async function retryChatMessage(token: string | undefined) {
   const prepared = await prepareChatRetry(token);
-  const reply = await sendChatCompletion(prepared.history, prepared.systemPrompt);
+  const reply = await sendChatCompletion(prepared.history, prepared.systemPrompt, {
+    isVision: prepared.isVision,
+  });
   return finalizeChatResponse(prepared, reply);
 }
 
 export async function prepareChatMessage(
   resolved: { sessionId: string; token: string },
   message: string,
+  image?: string,
 ): Promise<PreparedChatResponse> {
+  // If an image is provided, bypass normal routing and dispatch directly to Vision Agent
+  if (image) {
+    const visionAgent = await import("./agents/vision.agent");
+    return visionAgent.prepareVisionResponse(resolved.sessionId, message, image);
+  }
+
   await prisma.chatMessage.create({
     data: {
       sessionId: resolved.sessionId,
@@ -116,6 +131,24 @@ export async function prepareChatMessage(
     };
   }
 
+  // Fetch recent history for intent routing
+  const historyRecords = await prisma.chatMessage.findMany({
+    where: { sessionId: resolved.sessionId },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+  const recentHistory = historyRecords.reverse().map((msg) => ({
+    role: msg.role === "USER" ? "user" : "assistant",
+    content: msg.content,
+  })) as import("../types/chat").ChatCompletionMessage[];
+
+  // Route Intent (Multi-Agent Dispatch)
+  const intent = await (await import("./agents/router.agent")).routeUserIntent(message, recentHistory);
+
+  if (intent === "TRIAGE") {
+    return (await import("./agents/triage.agent")).prepareTriageResponse(resolved.sessionId, message);
+  }
+
   return prepareNormalResponse(resolved.sessionId, message);
 }
 
@@ -142,7 +175,18 @@ export async function finalizeChatResponse(
   rawReply: string,
 ): Promise<ChatReply> {
   // Apply Output Guardrails
-  const reply = validateOutputGuardrails(rawReply);
+  let reply = validateOutputGuardrails(rawReply);
+  
+  let sbarComplete = false;
+  if (reply.includes("<SBAR_READY>")) {
+    sbarComplete = true;
+    reply = reply.replace(/<SBAR_READY>/g, "").trim();
+    
+    await prisma.chatSession.update({
+      where: { id: prepared.sessionId },
+      data: { sbarComplete: true },
+    });
+  }
 
   await prisma.chatMessage.create({
     data: {
@@ -232,6 +276,7 @@ export async function finalizeChatResponse(
     reply,
     leadComplete,
     isEmergency: prepared.isEmergency,
+    sbarComplete,
     sources: prepared.sources,
     products,
     doctorReferral,
@@ -429,22 +474,114 @@ function buildDynamicSuggestions(
   const textLower = replyText.toLowerCase();
   const queryLower = userQuery.toLowerCase();
 
-  if (doctorReferral || queryLower.includes("dokter") || queryLower.includes("spesialis") || textLower.includes("sp.pd")) {
-    suggestions.push(`Hubungkan ke ${doctorReferral?.name || "Dokter Spesialis Sp.PD"}`);
-    suggestions.push("Apa saja persiapan sebelum konsultasi spesialis?");
-    suggestions.push("Mau lihat obat & alat pendamping dulu");
-  } else if (textLower.includes("luka") || queryLower.includes("luka")) {
-    suggestions.push("Bagaimana perawatan luka diabetes yang aman?");
-    suggestions.push("Hubungkan saya dengan Dokter Spesialis Luka");
-    suggestions.push("Berapa lama gel ini bisa menyembuhkan luka?");
+  // 1. Hipoglikemia / Gula Darah Rendah
+  if (
+    queryLower.includes("rendah") ||
+    queryLower.includes("drop") ||
+    queryLower.includes("gemetar") ||
+    queryLower.includes("keringat dingin") ||
+    queryLower.includes("hipoglikemia") ||
+    textLower.includes("hipoglikemia")
+  ) {
+    suggestions.push("Apa langkah pertolongan pertama saat gula darah drop?");
+    suggestions.push("Berapa batas angka gula darah yang tergolong hipoglikemia?");
+    suggestions.push("Kapan kondisi hipoglikemia harus segera dibawa ke IGD?");
+  }
+  // 2. Hiperglikemia / Gula Darah Tinggi
+  else if (
+    queryLower.includes("tinggi") ||
+    queryLower.includes("lonjakan") ||
+    queryLower.includes("haus terus") ||
+    queryLower.includes("sering kencing") ||
+    queryLower.includes("hiperglikemia") ||
+    textLower.includes("hiperglikemia") ||
+    queryLower.includes(">") ||
+    queryLower.includes("150") ||
+    queryLower.includes("200")
+  ) {
+    suggestions.push("Kapan waktu terbaik tes gula darah setelah makan?");
+    suggestions.push("Bagaimana cara alami meredakan lonjakan gula darah?");
+    suggestions.push("Apakah kadar gula darah tinggi ini butuh rujukan dokter?");
+  }
+  // 3. HbA1c & Tes Laboratorium
+  else if (
+    queryLower.includes("hba1c") ||
+    queryLower.includes("lab") ||
+    queryLower.includes("tes darah") ||
+    textLower.includes("hba1c")
+  ) {
+    suggestions.push("Berapa target nilai HbA1c yang aman untuk penderita diabetes?");
+    suggestions.push("Berapa bulan sekali sebaiknya tes HbA1c diulang?");
+    suggestions.push("Apakah hasil HbA1c dipengaruhi makanan sehari sebelumnya?");
+  }
+  // 4. Obat-obatan & Terapi (Metformin, Insulin, GLP-1)
+  else if (
+    queryLower.includes("obat") ||
+    queryLower.includes("metformin") ||
+    queryLower.includes("insulin") ||
+    queryLower.includes("glp-1") ||
+    queryLower.includes("glimepiride") ||
+    textLower.includes("metformin") ||
+    textLower.includes("insulin")
+  ) {
+    suggestions.push("Kapan waktu terbaik minum obat diabetes (sebelum/sesudah makan)?");
+    suggestions.push("Apa efek samping umum yang perlu saya antisipasi?");
+    suggestions.push("Apakah obat penurun gula darah harus diminum seumur hidup?");
+  }
+  // 5. Pola Makan & Diet Diabetes
+  else if (
+    queryLower.includes("makan") ||
+    queryLower.includes("diet") ||
+    queryLower.includes("buah") ||
+    queryLower.includes("nasi") ||
+    queryLower.includes("puasa") ||
+    queryLower.includes("gula") ||
+    textLower.includes("pola makan") ||
+    textLower.includes("indeks glikemik")
+  ) {
+    suggestions.push("Buah apa saja yang aman dikonsumsi dan rendah indeks glikemik?");
+    suggestions.push("Berapa porsi karbohidrat yang disarankan untuk penderita diabetes?");
+    suggestions.push("Bagaimana tips aman berpuasa bagi penderita diabetes?");
+  }
+  // 6. Luka & Komplikasi Kaki (Neuropati)
+  else if (
+    queryLower.includes("luka") ||
+    queryLower.includes("kebas") ||
+    queryLower.includes("kesemutan") ||
+    queryLower.includes("kaki") ||
+    textLower.includes("luka") ||
+    textLower.includes("neuropati")
+  ) {
+    suggestions.push("Bagaimana cara merawat luka diabetes yang aman di rumah?");
+    suggestions.push("Kenapa kaki penderita diabetes sering terasa baal atau kebas?");
+    suggestions.push("Hubungkan saya dengan Dokter Spesialis Perawatan Luka");
+  }
+  // 7. Olahraga & Aktivitas Fisik
+  else if (
+    queryLower.includes("olahraga") ||
+    queryLower.includes("senam") ||
+    queryLower.includes("jalan kaki") ||
+    queryLower.includes("aktivitas") ||
+    textLower.includes("olahraga")
+  ) {
+    suggestions.push("Jenis olahraga apa yang paling efektif memperbaiki insulin?");
+    suggestions.push("Bolehkah olahraga saat gula darah sedang tinggi (>250 mg/dL)?");
+    suggestions.push("Kapan waktu terbaik cek gula darah saat ingin olahraga?");
+  }
+  // 8. Rujukan Dokter / Produk
+  else if (doctorReferral) {
+    suggestions.push(`Konsultasi langsung dengan ${doctorReferral.name}`);
+    suggestions.push("Apa saja data riwayat yang perlu disiapkan untuk dokter?");
+    suggestions.push("Rekomendasi alat cek gula darah mandiri di rumah");
   } else if (products && products.length > 0) {
-    suggestions.push("Bagaimana aturan pakai & efek samping Metformin?");
-    suggestions.push("Apakah butuh resep dokter untuk beli ini?");
-    suggestions.push("Ada suplemen herbal pendamping gula darah?");
+    suggestions.push("Bagaimana cara penggunaan alat cek gula darah yang akurat?");
+    suggestions.push("Apakah produk ini membutuhkan resep dokter?");
+    suggestions.push("Konsultasikan hasil tes mandiri dengan dokter");
   } else {
-    suggestions.push("Gula darah puasa saya di atas 140 mg/dL");
-    suggestions.push("Saya sering merasa cepat lelah & haus berlebihan");
-    suggestions.push("Belum pernah tes gula darah, mau tanya caranya");
+    // Default exploratory anticipatory suggestions
+    suggestions.push("Gula darah puasa saya di atas 130 mg/dL, apa artinya?");
+    suggestions.push("Apa saja tanda awal diabetes yang sering tidak disadari?");
+    suggestions.push("Bagaimana panduan pola makan sehat untuk mencegah komplikasi?");
   }
 
   return suggestions.slice(0, 3);

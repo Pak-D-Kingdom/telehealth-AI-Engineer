@@ -1,6 +1,7 @@
 export interface ChatCompletionMessage {
-  role: "user" | "assistant";
-  content: string;
+  role: "user" | "assistant" | "system";
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+  image?: string;
 }
 
 export interface LeadData {
@@ -40,6 +41,7 @@ export interface ChatReply {
   reply: string;
   leadComplete: boolean;
   isEmergency: boolean;
+  sbarComplete?: boolean;
   sources: ChatSource[];
   products?: ProductRef[];
   doctorReferral?: DoctorRef;

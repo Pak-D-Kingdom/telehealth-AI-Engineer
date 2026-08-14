@@ -118,6 +118,7 @@ model ChatSession {
   status       ChatSessionStatus @default(ACTIVE)
   leadCaptured Boolean           @default(false) @map("lead_captured")
   isEmergency  Boolean           @default(false) @map("is_emergency")
+  sbarComplete Boolean           @default(false) @map("sbar_complete")
   expiresAt    DateTime          @map("expires_at")
   messages     ChatMessage[]
   lead         ChatLead?

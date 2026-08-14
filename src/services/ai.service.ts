@@ -8,6 +8,7 @@ interface CompletionOptions {
   maxTokens?: number;
   model?: string;
   temperature?: number;
+  isVision?: boolean;
 }
 
 export type AIProviderState =
@@ -82,7 +83,7 @@ export function getAIProviderStatus(model = env.GROQ_CHAT_MODEL): AIProviderStat
  * Executes an LLM completion with automatic multi-key rotation (Groq key 1..N -> OpenRouter)
  */
 async function callLLMWithRotation(
-  messages: Array<{ role: string; content: string | null; tool_calls?: any }>,
+  messages: Array<{ role: string; content: any; tool_calls?: any }>,
   model: string = env.GROQ_CHAT_MODEL,
   options: CompletionOptions = {},
 ): Promise<any> {
@@ -93,52 +94,57 @@ async function callLLMWithRotation(
     throw new AppError(503, "CHATBOT_NOT_CONFIGURED", "Layanan AI belum dikonfigurasi.");
   }
 
-  // 1. Try Groq Keys via Rotation
-  for (let i = 0; i < totalGroq; i++) {
-    const keyIndex = (currentGroqKeyIndex + i) % totalGroq;
-    const apiKey = groqKeys[keyIndex]!;
+  const effectiveGroqModel = model;
+  const effectiveOpenRouterModel = options.isVision
+    ? "openai/gpt-4o-mini"
+    : "meta-llama/llama-3.3-70b-instruct";
 
-    try {
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          max_tokens: options.maxTokens ?? 512,
-          temperature: options.temperature ?? 0.2,
-          ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
-        }),
-      });
+  // 1. Try Groq Keys via Rotation (Only for non-vision, since Groq has decommissioned vision models)
+  if (!options.isVision) {
+    for (let i = 0; i < totalGroq; i++) {
+      const keyIndex = (currentGroqKeyIndex + i) % totalGroq;
+      const apiKey = groqKeys[keyIndex]!;
 
-      if (response.status === 429) {
-        console.warn(`[Key Rotation] Groq key index ${keyIndex} rate limited (429). Rotating...`);
-        continue;
+      try {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: effectiveGroqModel,
+            messages,
+            max_tokens: options.maxTokens ?? 512,
+            temperature: options.temperature ?? 0.2,
+            ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
+          }),
+        });
+
+        if (response.status === 429) {
+          console.warn(`[Key Rotation] Groq key index ${keyIndex} rate limited (429). Rotating...`);
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[Key Rotation] Groq key index ${keyIndex} failed (${response.status}):`, errorText);
+          if (response.status >= 500) continue;
+          throw new Error(`Groq API error: ${response.status} ${errorText}`);
+        }
+
+        // Success - update active key index
+        currentGroqKeyIndex = (keyIndex + 1) % totalGroq;
+        markModelReady(effectiveGroqModel);
+        return await response.json();
+      } catch (err: any) {
+        console.warn(`[Key Rotation] Error with Groq key index ${keyIndex}:`, err.message || err);
       }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Key Rotation] Groq key index ${keyIndex} failed (${response.status}):`, errorText);
-        if (response.status >= 500) continue;
-        throw new Error(`Groq API error: ${response.status} ${errorText}`);
-      }
-
-      // Success - update active key index
-      currentGroqKeyIndex = (keyIndex + 1) % totalGroq;
-      markModelReady(model);
-      return await response.json();
-    } catch (err: any) {
-      if (err.message?.includes("Groq API error")) throw err;
-      console.warn(`[Key Rotation] Network error with key index ${keyIndex}:`, err.message);
     }
   }
 
-  // 2. OpenRouter Fallback
+  // 2. OpenRouter Fallback / Primary for Vision
   if (openRouterKeys.length > 0) {
-    console.log("[Key Rotation] All Groq keys exhausted. Attempting OpenRouter fallback...");
     for (const openRouterKey of openRouterKeys) {
       try {
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -148,7 +154,7 @@ async function callLLMWithRotation(
             Authorization: `Bearer ${openRouterKey}`,
           },
           body: JSON.stringify({
-            model: "meta-llama/llama-3.3-70b-instruct",
+            model: effectiveOpenRouterModel,
             messages,
             max_tokens: options.maxTokens ?? 512,
           }),
@@ -156,6 +162,9 @@ async function callLLMWithRotation(
 
         if (response.ok) {
           return await response.json();
+        } else {
+          const errorText = await response.text();
+          console.error("[Key Rotation] OpenRouter error:", response.status, errorText);
         }
       } catch (err) {
         console.error("[Key Rotation] OpenRouter attempt failed:", err);
@@ -192,43 +201,123 @@ export async function* streamChatCompletion(
   systemPrompt: string,
   options: CompletionOptions = {},
 ) {
-  const model = options.model ?? env.GROQ_CHAT_MODEL;
-  const { groqKeys } = getAllApiKeys();
-  const apiKey = groqKeys[currentGroqKeyIndex] || env.GROQ_API_KEY;
+  const { groqKeys, openRouterKeys } = getAllApiKeys();
+  const payloadMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
-  if (!apiKey) {
-    throw new AppError(503, "CHATBOT_NOT_CONFIGURED", "Layanan chatbot belum dikonfigurasi.");
-  }
+  // If Vision is requested, use OpenRouter with GPT-4o-mini
+  if (options.isVision && openRouterKeys.length > 0) {
+    for (const openRouterKey of openRouterKeys) {
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openRouterKey}`,
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-4o-mini",
+            messages: payloadMessages,
+            max_tokens: options.maxTokens ?? 512,
+            stream: true,
+          }),
+        });
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "system", content: systemPrompt }, ...messages],
-      max_tokens: options.maxTokens ?? 512,
-      temperature: options.temperature ?? 0.2,
-      stream: true,
-    }),
-  });
-
-  if (!response.ok || !response.body) {
-    throw new AppError(502, "INVALID_AI_RESPONSE", "Stream AI gagal diinisialisasi.");
-  }
-
-  for await (const data of readServerSentEvents(response.body)) {
-    if (data === "[DONE]") return;
-    try {
-      const parsed = JSON.parse(data);
-      const content = parsed.choices?.[0]?.delta?.content;
-      if (content) yield content;
-    } catch {
-      // ignore parse errors in chunk
+        if (response.ok && response.body) {
+          for await (const data of readServerSentEvents(response.body)) {
+            if (data === "[DONE]") return;
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) yield content;
+            } catch {
+              // ignore parse errors in chunk
+            }
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn("[Stream AI] OpenRouter vision streaming failed:", err);
+      }
     }
   }
+
+  // Normal text streaming via Groq
+  const model = options.model ?? env.GROQ_CHAT_MODEL;
+  const apiKey = groqKeys[currentGroqKeyIndex] || env.GROQ_API_KEY;
+
+  if (apiKey) {
+    try {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: payloadMessages,
+          max_tokens: options.maxTokens ?? 512,
+          temperature: options.temperature ?? 0.2,
+          stream: true,
+        }),
+      });
+
+      if (response.ok && response.body) {
+        for await (const data of readServerSentEvents(response.body)) {
+          if (data === "[DONE]") return;
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) yield content;
+          } catch {
+            // ignore parse errors in chunk
+          }
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn("[Stream AI] Groq streaming failed, attempting OpenRouter fallback...", err);
+    }
+  }
+
+  // OpenRouter fallback for text streaming
+  if (openRouterKeys.length > 0) {
+    for (const openRouterKey of openRouterKeys) {
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openRouterKey}`,
+          },
+          body: JSON.stringify({
+            model: "meta-llama/llama-3.3-70b-instruct",
+            messages: payloadMessages,
+            max_tokens: options.maxTokens ?? 512,
+            stream: true,
+          }),
+        });
+
+        if (response.ok && response.body) {
+          for await (const data of readServerSentEvents(response.body)) {
+            if (data === "[DONE]") return;
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) yield content;
+            } catch {
+              // ignore parse errors in chunk
+            }
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn("[Stream AI] OpenRouter streaming fallback failed:", err);
+      }
+    }
+  }
+
+  throw new AppError(502, "INVALID_AI_RESPONSE", "Layanan AI tidak dapat mengalirkan respons.");
 }
 
 async function* readServerSentEvents(stream: ReadableStream<Uint8Array>) {

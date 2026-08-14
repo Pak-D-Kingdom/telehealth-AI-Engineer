@@ -25,7 +25,7 @@ export const sendMessage: RequestHandler = async (req, res) => {
   const session = await resolveOrCreateChatSession(token);
 
   res.cookie(CHAT_SESSION_COOKIE_NAME, session.token, chatSessionCookieOptions);
-  const data = await processChatMessage(session, input.message);
+  const data = await processChatMessage(session, input.message, input.image);
   res.status(200).json({ data });
 };
 
@@ -35,7 +35,7 @@ export const sendMessageStream: RequestHandler = async (req, res) => {
   const session = await resolveOrCreateChatSession(token);
 
   res.cookie(CHAT_SESSION_COOKIE_NAME, session.token, chatSessionCookieOptions);
-  const prepared = await prepareChatMessage(session, input.message);
+  const prepared = await prepareChatMessage(session, input.message, input.image);
   await streamPreparedResponse(res, prepared);
 };
 
@@ -111,9 +111,36 @@ async function streamPreparedResponse(
 
   try {
     let reply = "";
-    for await (const token of streamChatCompletion(prepared.history, prepared.systemPrompt)) {
+    let buffer = "";
+    
+    for await (const token of streamChatCompletion(prepared.history, prepared.systemPrompt, {
+      isVision: prepared.isVision,
+    })) {
       reply += token;
-      writeStreamEvent(res, "token", { token });
+      buffer += token;
+
+      if (buffer.includes("<")) {
+        const lastOpen = buffer.lastIndexOf("<");
+        const potentialTag = buffer.substring(lastOpen);
+        
+        if ("<SBAR_READY>".startsWith(potentialTag)) {
+          const safePart = buffer.substring(0, lastOpen);
+          if (safePart) {
+            writeStreamEvent(res, "token", { token: safePart });
+          }
+          buffer = potentialTag;
+        } else {
+          writeStreamEvent(res, "token", { token: buffer });
+          buffer = "";
+        }
+      } else {
+        writeStreamEvent(res, "token", { token: buffer });
+        buffer = "";
+      }
+    }
+
+    if (buffer && buffer !== "<SBAR_READY>") {
+      writeStreamEvent(res, "token", { token: buffer });
     }
 
     if (!reply.trim()) {
@@ -161,12 +188,20 @@ function toStreamCompletion(reply: {
   sessionId: string;
   leadComplete: boolean;
   isEmergency: boolean;
+  sbarComplete?: boolean;
   sources: unknown;
+  products?: unknown;
+  doctorReferral?: unknown;
+  suggestions?: string[];
 }) {
   return {
     sessionId: reply.sessionId,
     leadComplete: reply.leadComplete,
     isEmergency: reply.isEmergency,
+    sbarComplete: reply.sbarComplete,
     sources: reply.sources,
+    products: reply.products,
+    doctorReferral: reply.doctorReferral,
+    suggestions: reply.suggestions,
   };
 }
