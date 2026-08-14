@@ -65,6 +65,9 @@ telehealth-ai/
 ├── PRD.md                            # Document Spesifikasi & Architecture (File Ini)
 ├── README.md                         # Panduan cara menjalankan project & API docs singkat
 │
+├── db/                               # 📁 DOKUMEN MIGRASI DATABASE
+│   └── schema.sql                    # Schema SQL Database pgvector (Tabel documents & RPC function)
+│
 └── app/                              # 📁 FOLDER UTAMA APLIKASI
     ├── __init__.py
     ├── config.py                     # Centralized environment configuration (Pydantic Settings & Groq Models)

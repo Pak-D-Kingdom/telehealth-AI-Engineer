@@ -19,8 +19,9 @@ class Settings(BaseSettings):
     # Free Local Embedding Model for Vector Search (SentenceTransformers)
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
-    # Supabase Settings
-    SUPABASE_URL: str = ""
+    # Local Lightweight pgvector Database & Supabase Settings (Port 5435 to avoid backend port 5434 conflict)
+    DATABASE_URL: str = "postgresql://postgres:postgrespassword@localhost:5435/telehealth_db"
+    SUPABASE_URL: str = "http://127.0.0.1:54321"
     SUPABASE_KEY: str = ""
 
     class Config:

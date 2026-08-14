@@ -1,8 +1,4 @@
-# Telehealth AI Microservice (Diabetes Care Focus)
-
-AI Agent Microservice khusus penderita diabetes
-
----
+# Telehealth AI (Diabetes Care Focus)
 
 ## Teknologi
 
@@ -32,7 +28,7 @@ docker compose version
 
 ## Instalasi & Cara Menjalankan
 
-### Cara 1: Menggunakan Docker Compose (Sangat Direkomendasikan)
+### Cara 1: Menggunakan Docker Compose
 
 1. Masuk ke direktori proyek:
    ```bash
@@ -58,6 +54,45 @@ Service AI siap diakses pada **`http://localhost:8000`**.
 
 ---
 
+### Cara 2: Menjalankan Secara Lokal (Tanpa Docker - Python Virtual Environment)
+
+1. **Masuk ke direktori proyek:**
+   ```bash
+   cd telehealth-AI-Engineer
+   ```
+
+2. **Buat dan aktifkan Python Virtual Environment:**
+   * **Windows (PowerShell / Command Prompt):**
+     ```powershell
+     python -m venv venv
+     .\venv\Scripts\Activate
+     ```
+   * **Linux / macOS:**
+     ```bash
+     python3 -m venv venv
+     source venv/bin/activate
+     ```
+
+3. **Install seluruh dependensi proyek:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Salin & sesuaikan file environment:**
+   ```bash
+   cp .env.example .env
+   ```
+   *(Buka file `.env` dan isi `GROQ_API_KEY`, `SUPABASE_URL`, dan `SUPABASE_KEY`)*
+
+5. **Jalankan server FastAPI secara lokal:**
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
+
+Service AI siap diakses secara lokal pada **`http://localhost:8000`** (Swagger UI di `http://localhost:8000/docs`).
+
+---
+
 ## Konfigurasi Environment
 
 | Nama Variable | Nilai Default | Keterangan |
@@ -67,56 +102,67 @@ Service AI siap diakses pada **`http://localhost:8000`**.
 | `X_AI_API_KEY` | `telehealth_ai_secret_key_dev` | Secret Key untuk autentikasi internal dari Backend Bun |
 | `GROQ_API_KEY` | `gsk_...` | API Key Groq untuk komputasi cepat LLM & Fallback |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Model Local Embedding Gratis (SentenceTransformers) |
-| `SUPABASE_URL` | `https://...supabase.co` | URL proyek Supabase |
-| `SUPABASE_KEY` | `ey...` | API Key / Anon Key Supabase untuk akses `pgvector` |
+| `SUPABASE_URL` | `http://127.0.0.1:54321` | URL Supabase Lokal (Supabase CLI default) |
+| `SUPABASE_KEY` | `ey...` | Anon Key Supabase Lokal untuk akses `pgvector` |
+
+---
+
+## Setup Database Supabase / pgvector Lokal
+
+1. **Jalankan Supabase Lokal:**
+   ```bash
+   supabase start
+   ```
+2. **Jalankan Schema Database:**
+   Buka **Supabase Studio** di `http://127.0.0.1:54323` $\rightarrow$ **SQL Editor**, atau jalankan file `db/schema.sql` untuk secara otomatis membuat tabel `documents` (dengan `VECTOR(384)`) dan fungsi RPC `match_documents`.
 
 ---
 
 ## Struktur Folder Proyek
 
 ```text
-telehealth-ai/
+telehealth-AI-Engineer/
 ├── .env                              # Environment variables lokal
 ├── .env.example                      # Template environment variables
 ├── .gitignore                        # Git ignore file
-├── Dockerfile                        # Multi-stage Dockerfile Python 3.10-slim
 ├── compose.yaml                      # Docker Compose orkestrasi port 8000
-├── requirements.txt                  # Dependensi Python
+├── Dockerfile                        # Multi-stage Dockerfile Python 3.10-slim
 ├── main.py                           # Application entry point & FastAPI instance
 ├── PRD.md                            # Dokumen Spesifikasi Arsitektur & Fitur
 ├── README.md                         # Dokumentasi proyek (File Ini)
+├── requirements.txt                  # Dependensi Python
+│
+├── db/                               # 📁 DOKUMEN MIGRASI DATABASE
+│   └── schema.sql                    # Schema SQL Database pgvector lokal
 │
 └── app/                              # 📁 FOLDER UTAMA APLIKASI
     ├── __init__.py
     ├── config.py                     # Centralized config via Pydantic Settings
     │
-    ├── knowledge_base/               # 📁 DOKUMEN KNOWLEDGE BASE DIABETES (.md)
-    │   ├── device_manuals.md         # Panduan cara pakai alat glucometer & strip tes
-    │   ├── diabetes_faq.md           # Ambang batas gula darah & pertolongan hipoglikemia
-    │   └── nutrition_guide.md        # Panduan pola makan indeks glikemik rendah (Low GI)
+    ├── agents/                       # 🤖 MULTI-AGENT LOGIC
+    │   ├── __init__.py
+    │   ├── ads_agent.py              # Placeholder Agent Ads / Marketing (Fase 2)
+    │   ├── customer_agent.py         # Diabetes Patient Care Agent (RAG + Guardrail)
+    │   └── finance_agent.py          # Placeholder Agent Keuangan (Fase 2)
     │
     ├── core/                         # 🛡️ SHARED CORE UTILITIES
     │   ├── __init__.py
-    │   ├── llm.py                    # Unified Interface Groq API + Round-Robin Fallback
     │   ├── embeddings.py             # Service khusus generator Vector Embedding
-    │   └── guardrail.py              # Filter keselamatan medis & penambahan disclaimer otomatis
+    │   ├── guardrail.py              # Filter keselamatan medis & penambahan disclaimer otomatis
+    │   └── llm.py                    # Unified Interface Groq API + Round-Robin Fallback
     │
-    ├── services/                     # ⚙️ RAG & VECTOR STORAGE (SUPABASE)
+    ├── knowledge_base/               # 📁 DOKUMEN KNOWLEDGE BASE DIABETES (.md)
+    │
+    ├── routers/                      # 🌐 REST API ENDPOINTS & PYDANTIC DTOs
     │   ├── __init__.py
-    │   ├── vector_store.py           # Inisialisasi Supabase Client & Similarity Search pgvector
-    │   └── ingest_service.py         # Skrip pengunggah file .md di app/knowledge_base/ ke Supabase
+    │   ├── ads_router.py             # Endpoint POST /api/v1/ads/analyze (Fase 2)
+    │   ├── customer_router.py        # Endpoint POST /api/v1/customer/chat
+    │   └── finance_router.py         # Endpoint POST /api/v1/finance/analyze (Fase 2)
     │
-    ├── agents/                       # 🤖 MULTI-AGENT LOGIC
-    │   ├── __init__.py
-    │   ├── customer_agent.py         # Diabetes Patient Care Agent (RAG + Guardrail)
-    │   ├── finance_agent.py          # Placeholder Agent Keuangan (Fase 2)
-    │   └── ads_agent.py              # Placeholder Agent Ads / Marketing (Fase 2)
-    │
-    └── routers/                      # 🌐 REST API ENDPOINTS & PYDANTIC DTOs
+    └── services/                     # ⚙️ RAG & VECTOR STORAGE (SUPABASE)
         ├── __init__.py
-        ├── customer_router.py        # Endpoint POST /api/v1/customer/chat
-        ├── finance_router.py         # Endpoint POST /api/v1/finance/analyze (Fase 2)
-        └── ads_router.py             # Endpoint POST /api/v1/ads/analyze (Fase 2)
+        ├── ingest_service.py         # Skrip pengunggah file .md di app/knowledge_base/ ke Supabase
+        └── vector_store.py           # Inisialisasi Supabase Client & Similarity Search pgvector
 ```
 
 ---

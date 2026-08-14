@@ -5,8 +5,8 @@ from app.routers import customer_router, finance_router, ads_router
 from app.services.ingest_service import ingest_service
 
 app = FastAPI(
-    title="Telehealth AI Microservice (Diabetes Care)",
-    description="Microservice AI pendampingan Diabetes Care berbasis RAG Supabase pgvector dan Multi-Agent.",
+    title="Telehealth AI",
+    description="AI pendampingan Diabetes",
     version="1.0.0"
 )
 
@@ -32,7 +32,7 @@ async def health_check():
         "version": "1.0.0",
         "domain": "diabetes-care",
         "environment": settings.NODE_ENV,
-        "llm_model": settings.LLM_MODEL
+        "llm_model": settings.GROQ_MODELS[0] if settings.GROQ_MODELS else "llama-3.3-70b-versatile"
     }
 
 @app.post("/api/v1/ingest", tags=["Admin / Ingest"])
