@@ -7,27 +7,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserRole {
-  ADMIN
-}
-
-enum ChatSessionStatus {
-  ACTIVE
-  COMPLETED
-  ABANDONED
-}
-
-enum ChatMessageRole {
-  USER
-  ASSISTANT
-}
-
-enum LeadQualificationStatus {
-  ELIGIBLE
-  NEEDS_REVIEW
-  NOT_ELIGIBLE
-}
-
 model User {
   id           String        @id @default(uuid()) @db.Uuid
   email        String        @unique @db.VarChar(255)
@@ -35,9 +14,9 @@ model User {
   name         String        @db.VarChar(120)
   role         UserRole      @default(ADMIN)
   isActive     Boolean       @default(true) @map("is_active")
-  sessions     UserSession[]
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
+  sessions     UserSession[]
 
   @@map("users")
 }
@@ -82,9 +61,9 @@ model Doctor {
   registrationNumber String?                    @map("registration_number") @db.VarChar(120)
   image              String?                    @db.VarChar(500)
   isActive           Boolean                    @default(true) @map("is_active")
-  categories         DoctorCategoryAssignment[]
   createdAt          DateTime                   @default(now()) @map("created_at")
   updatedAt          DateTime                   @updatedAt @map("updated_at")
+  categories         DoctorCategoryAssignment[]
 
   @@index([isActive])
   @@map("doctors")
@@ -94,9 +73,9 @@ model DoctorCategory {
   id          String                     @id @db.VarChar(50)
   name        String                     @unique @db.VarChar(120)
   description String?
-  doctors     DoctorCategoryAssignment[]
   createdAt   DateTime                   @default(now()) @map("created_at")
   updatedAt   DateTime                   @updatedAt @map("updated_at")
+  doctors     DoctorCategoryAssignment[]
 
   @@map("doctor_categories")
 }
@@ -104,8 +83,8 @@ model DoctorCategory {
 model DoctorCategoryAssignment {
   doctorId   String         @map("doctor_id") @db.Uuid
   categoryId String         @map("category_id") @db.VarChar(50)
-  doctor     Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   category   DoctorCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  doctor     Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   @@id([doctorId, categoryId])
   @@index([categoryId])
@@ -118,12 +97,12 @@ model ChatSession {
   status       ChatSessionStatus @default(ACTIVE)
   leadCaptured Boolean           @default(false) @map("lead_captured")
   isEmergency  Boolean           @default(false) @map("is_emergency")
-  sbarComplete Boolean           @default(false) @map("sbar_complete")
   expiresAt    DateTime          @map("expires_at")
-  messages     ChatMessage[]
-  lead         ChatLead?
   createdAt    DateTime          @default(now()) @map("created_at")
   updatedAt    DateTime          @updatedAt @map("updated_at")
+  sbarComplete Boolean           @default(false) @map("sbar_complete")
+  lead         ChatLead?
+  messages     ChatMessage[]
 
   @@index([expiresAt])
   @@index([status])
@@ -135,9 +114,9 @@ model ChatMessage {
   sessionId String          @map("session_id") @db.Uuid
   role      ChatMessageRole
   content   String
-  sources   Json?           @db.JsonB
-  session   ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   createdAt DateTime        @default(now()) @map("created_at")
+  sources   Json?
+  session   ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
   @@map("chat_messages")
@@ -152,23 +131,44 @@ model ChatLead {
   currentMedication   String?                  @map("current_medication")
   primaryComplaint    String?                  @map("primary_complaint")
   qualificationStatus LeadQualificationStatus? @map("qualification_status")
-  session             ChatSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   createdAt           DateTime                 @default(now()) @map("created_at")
   updatedAt           DateTime                 @updatedAt @map("updated_at")
+  session             ChatSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("chat_leads")
 }
 
 model KnowledgeBase {
-  id         String                 @id @default(uuid()) @db.Uuid
-  title      String                 @db.VarChar(240)
+  id         String                @id @default(uuid()) @db.Uuid
+  title      String                @db.VarChar(240)
   content    String
-  embedding  Unsupported("vector(3072)")
-  source     String                 @db.VarChar(240)
-  chunkIndex Int                    @default(0) @map("chunk_index")
-  createdAt  DateTime               @default(now()) @map("created_at")
-  updatedAt  DateTime               @updatedAt @map("updated_at")
+  embedding  Unsupported("vector")
+  source     String                @db.VarChar(240)
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+  chunkIndex Int                   @default(0) @map("chunk_index")
 
   @@unique([source, chunkIndex])
   @@map("knowledge_base")
+}
+
+enum UserRole {
+  ADMIN
+}
+
+enum ChatSessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum LeadQualificationStatus {
+  ELIGIBLE
+  NEEDS_REVIEW
+  NOT_ELIGIBLE
 }
