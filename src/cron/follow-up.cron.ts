@@ -11,7 +11,7 @@ export async function runProactiveFollowUp() {
 
   try {
     // Find sessions that have been active and had messages
-    const cutoffTime = new Date(Date.now() - 30 * 60 * 1000); // 30 mins for demo/simulations
+    const cutoffTime = new Date(Date.now() - 1 * 60 * 1000); // 1 minute for demo/simulations
 
     const candidateSessions = await prisma.chatSession.findMany({
       where: {
@@ -22,6 +22,7 @@ export async function runProactiveFollowUp() {
         },
       },
       include: {
+        lead: true,
         messages: {
           orderBy: { createdAt: "desc" },
           take: 6,
@@ -76,6 +77,28 @@ export async function runProactiveFollowUp() {
         });
 
         console.log(`[Follow-up Cron] Proactive message sent to session ${session.id}`);
+
+        // Mengirim pesan WhatsApp melalui API Fonnte
+        if (session.lead?.whatsapp && process.env.FONNTE_TOKEN) {
+          try {
+            console.log(`[Follow-up Cron] Mengirim WA ke ${session.lead.whatsapp} via Fonnte...`);
+            const response = await fetch("https://api.fonnte.com/send", {
+              method: "POST",
+              headers: {
+                Authorization: process.env.FONNTE_TOKEN,
+              },
+              body: new URLSearchParams({
+                target: session.lead.whatsapp,
+                message: finalMessage,
+                countryCode: "62", // Default kode negara Indonesia
+              }),
+            });
+            const data = await response.json();
+            console.log(`[Follow-up Cron] Response Fonnte:`, data);
+          } catch (waError) {
+            console.error(`[Follow-up Cron] Gagal mengirim WA ke ${session.lead.whatsapp}:`, waError);
+          }
+        }
       } catch (err) {
         console.error(`[Follow-up Cron] Failed to generate follow-up for session ${session.id}:`, err);
       }
