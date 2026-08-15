@@ -3,31 +3,16 @@ from src.agent.intake_parser import IntakeParser
 
 
 class TriageEngine:
-    """
-    Mesin triage untuk diabetes.
-    Menganalisis data intake dan menentukan tingkat risiko.
-    
-    Output:
-    - risk_level: LOW, MEDIUM, HIGH, CRITICAL
-    - risk_score: 0-100
-    - red_flags: list kondisi darurat yang terdeteksi
-    - warnings: list kondisi yang perlu perhatian
-    - recommended_action: aksi yang disarankan
-    """
-
-    # Threshold gula darah (mg/dL)
     GD_HYPOGLYCEMIA = 70
     GD_WARNING_HIGH = 200
     GD_DANGER_HIGH = 300
     GD_EMERGENCY_HIGH = 400
 
-    # Threshold HbA1c (%)
     HBA1C_NORMAL = 5.7
     HBA1C_PREDIABETES = 6.5
     HBA1C_TARGET_DM = 7.0
     HBA1C_DANGER = 9.0
 
-    # Red flag symptoms (kondisi darurat)
     RED_FLAG_SYMPTOMS = {
         "pingsan": "penurunan_kesadaran",
         "tidak sadar": "penurunan_kesadaran",
@@ -50,7 +35,6 @@ class TriageEngine:
         "pandangan hilang": "retinopati",
     }
 
-    # Warning symptoms (perlu perhatian tapi tidak darurat)
     WARNING_SYMPTOMS = {
         "pandangan kabur": "retinopati_awal",
         "kesemutan": "neuropati",
@@ -69,45 +53,21 @@ class TriageEngine:
         self.parser = IntakeParser()
 
     def process(self, raw_intake: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Proses utama: parse intake → triage → hasil.
-        
-        Args:
-            raw_intake: JSON mentah dari intake form
-            
-        Returns:
-            Dict hasil triage lengkap
-        """
-        # Step 1: Parse & validasi
         parsed = self.parser.parse(raw_intake)
 
-        # Step 2: Deteksi red flags
         red_flags, red_flag_details = self._detect_red_flags(parsed)
-
-        # Step 3: Deteksi warnings
         warnings, warning_details = self._detect_warnings(parsed)
-
-        # Step 4: Analisis gula darah
         gd_analysis = self._analyze_blood_sugar(parsed)
-
-        # Step 5: Analisis HbA1c
         hba1c_analysis = self._analyze_hba1c(parsed)
-
-        # Step 6: Analisis faktor risiko tambahan
         risk_factors = self._analyze_risk_factors(parsed)
 
-        # Step 7: Hitung skor risiko
         risk_score = self._calculate_risk_score(
             red_flags, warnings, gd_analysis, hba1c_analysis, risk_factors
         )
 
-        # Step 8: Tentukan level risiko
         risk_level = self._determine_risk_level(risk_score, red_flags)
-
-        # Step 9: Tentukan aksi yang disarankan
         recommended_action = self._determine_action(risk_level, red_flag_details)
 
-        # Step 10: Susun output
         result = {
             "patient_info": {
                 "nama": parsed["nama"],
@@ -140,11 +100,9 @@ class TriageEngine:
         return result
 
     def _detect_red_flags(self, data: Dict) -> Tuple[List[str], List[Dict]]:
-        """Deteksi kondisi darurat dari gejala dan data klinis."""
         flags = []
         details = []
 
-        # Cek gejala darurat
         for gejala in data.get("gejala", []):
             for keyword, category in self.RED_FLAG_SYMPTOMS.items():
                 if keyword in gejala:
@@ -157,7 +115,6 @@ class TriageEngine:
                             "severity": "critical"
                         })
 
-        # Cek gula darah kritis
         gd = data.get("gula_darah_terakhir")
         if gd is not None:
             if gd <= self.GD_HYPOGLYCEMIA:
@@ -177,7 +134,6 @@ class TriageEngine:
                     "severity": "critical"
                 })
 
-        # Cek kehamilan + diabetes (risiko tinggi)
         if data.get("sedang_hamil") and data.get("sudah_terdiagnosis"):
             flags.append("diabetes_gestasional_risiko")
             details.append({
@@ -190,7 +146,6 @@ class TriageEngine:
         return flags, details
 
     def _detect_warnings(self, data: Dict) -> Tuple[List[str], List[Dict]]:
-        """Deteksi kondisi yang perlu perhatian tapi tidak darurat."""
         warnings = []
         details = []
 
@@ -206,7 +161,6 @@ class TriageEngine:
                             "severity": "warning"
                         })
 
-        # Cek gula darah warning level
         gd = data.get("gula_darah_terakhir")
         if gd is not None:
             if self.GD_WARNING_HIGH <= gd < self.GD_DANGER_HIGH:
@@ -218,7 +172,6 @@ class TriageEngine:
                     "severity": "warning"
                 })
 
-        # Cek tekanan darah
         td = data.get("tekanan_darah")
         if td:
             try:
@@ -237,7 +190,6 @@ class TriageEngine:
         return warnings, details
 
     def _analyze_blood_sugar(self, data: Dict) -> Dict[str, Any]:
-        """Analisis gula darah."""
         gd = data.get("gula_darah_terakhir")
         jenis_cek = data.get("jenis_cek_gula") or "sewaktu"
 
@@ -249,7 +201,6 @@ class TriageEngine:
                 "rekomendasi": "Perlu pemeriksaan gula darah"
             }
 
-        # Cek hipoglikemia dulu (berlaku untuk semua jenis cek)
         if gd <= self.GD_HYPOGLYCEMIA:
             kategori = "hipoglikemia"
         elif jenis_cek == "puasa":
@@ -259,7 +210,7 @@ class TriageEngine:
                 kategori = "prediabetes"
             else:
                 kategori = "diabetes"
-        else:  # sewaktu
+        else:
             if gd < 140:
                 kategori = "normal"
             elif gd < 200:
@@ -276,7 +227,6 @@ class TriageEngine:
         }
 
     def _gd_recommendation(self, kategori: str) -> str:
-        """Rekomendasi berdasarkan kategori gula darah."""
         recs = {
             "hipoglikemia": "Gula darah SANGAT RENDAH. Kondisi darurat. Segera konsumsi gula sederhana dan cari pertolongan medis.",
             "normal": "Gula darah dalam batas normal. Pertahankan pola hidup sehat.",
@@ -288,7 +238,6 @@ class TriageEngine:
         return recs.get(kategori, "")
 
     def _analyze_hba1c(self, data: Dict) -> Dict[str, Any]:
-        """Analisis HbA1c."""
         hba1c = data.get("hba1c")
 
         if hba1c is None:
@@ -318,7 +267,6 @@ class TriageEngine:
         }
 
     def _hba1c_recommendation(self, kategori: str) -> str:
-        """Rekomendasi berdasarkan HbA1c."""
         recs = {
             "normal": "HbA1c normal.",
             "prediabetes": "HbA1c di rentang prediabetes. Perlu intervensi gaya hidup.",
@@ -330,10 +278,8 @@ class TriageEngine:
         return recs.get(kategori, "")
 
     def _analyze_risk_factors(self, data: Dict) -> List[Dict]:
-        """Identifikasi faktor risiko tambahan."""
         factors = []
 
-        # Usia
         if data["usia"] >= 45:
             factors.append({
                 "type": "usia",
@@ -341,7 +287,6 @@ class TriageEngine:
                 "weight": 10
             })
 
-        # BMI
         bmi_cat = data.get("bmi_category", "")
         if bmi_cat in ["overweight", "obese_1", "obese_2"]:
             factors.append({
@@ -350,7 +295,6 @@ class TriageEngine:
                 "weight": 15 if bmi_cat == "obese_2" else 10
             })
 
-        # Riwayat keluarga
         if data.get("has_family_history"):
             factors.append({
                 "type": "riwayat_keluarga",
@@ -358,7 +302,6 @@ class TriageEngine:
                 "weight": 15
             })
 
-        # Hipertensi
         td = data.get("tekanan_darah")
         if td:
             try:
@@ -372,7 +315,6 @@ class TriageEngine:
             except (IndexError, ValueError):
                 pass
 
-        # Riwayat penyakit lain
         for penyakit in data.get("riwayat_penyakit_lain", []):
             factors.append({
                 "type": "komorbiditas",
@@ -390,16 +332,11 @@ class TriageEngine:
         hba1c_analysis: Dict,
         risk_factors: List[Dict]
     ) -> int:
-        """Hitung skor risiko 0-100."""
         score = 0
 
-        # Red flags: masing-masing +30
         score += len(red_flags) * 30
-
-        # Warnings: masing-masing +10
         score += len(warnings) * 10
 
-        # Gula darah
         gd_kategori = gd_analysis.get("kategori", "")
         gd_scores = {
             "diabetes": 20,
@@ -409,7 +346,6 @@ class TriageEngine:
         }
         score += gd_scores.get(gd_kategori, 0)
 
-        # HbA1c
         hba1c_kategori = hba1c_analysis.get("kategori", "")
         hba1c_scores = {
             "kontrol_buruk": 25,
@@ -420,16 +356,12 @@ class TriageEngine:
         }
         score += hba1c_scores.get(hba1c_kategori, 0)
 
-        # Risk factors
         for factor in risk_factors:
             score += factor.get("weight", 5)
 
-        # Cap at 100
         return min(score, 100)
 
     def _determine_risk_level(self, score: int, red_flags: List[str]) -> str:
-        """Tentukan level risiko berdasarkan skor dan red flags."""
-        # Jika ada red flag kritis, langsung CRITICAL
         critical_flags = [
             "penurunan_kesadaran", "kardiovaskular", "ketoasidosis",
             "hipoglikemia", "hiperglikemia_ekstrem", "gangren"
@@ -445,7 +377,6 @@ class TriageEngine:
             return "LOW"
 
     def _determine_action(self, risk_level: str, red_flag_details: List[Dict]) -> Dict:
-        """Tentukan aksi yang disarankan berdasarkan level risiko."""
         if risk_level == "CRITICAL":
             return {
                 "type": "emergency_referral",

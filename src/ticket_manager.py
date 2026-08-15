@@ -1,10 +1,6 @@
 from src.config import get_settings
 
 class TicketManager:
-    """
-    Membuat tiket dan link WhatsApp untuk handoff ke tim medis/admin.
-    """
-    
     def __init__(self):
         self.settings = get_settings()
         self.admin_number = self.settings.whatsapp_admin_number
@@ -17,10 +13,6 @@ class TicketManager:
         entities: dict,
         red_flags: list
     ) -> dict:
-        """
-        Membuat ringkasan tiket untuk handoff.
-        """
-        # Tentukan prioritas berdasarkan red flags
         if red_flags:
             priority = "urgent"
             ticket_type = "emergency"
@@ -34,7 +26,6 @@ class TicketManager:
             priority = "normal"
             ticket_type = "follow_up"
         
-        # Buat ringkasan
         summary_parts = [
             f"Session: {session_id}",
             f"Intent: {intent}",

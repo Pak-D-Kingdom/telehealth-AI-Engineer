@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     # App Config
     whatsapp_admin_number: str = Field(default="", alias="WHATSAPP_ADMIN_NUMBER")
+    backend_url: str = Field(default="http://localhost:4000", alias="BACKEND_URL")
     database_url: str = Field(default="sqlite:///data/skincarebot.db", alias="DATABASE_URL")
     faiss_index_dir: str = Field(default="faiss_index", alias="FAISS_INDEX_DIR")
     knowledge_base_dir: str = Field(default="knowledge_base", alias="KNOWLEDGE_BASE_DIR")

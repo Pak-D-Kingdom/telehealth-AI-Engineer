@@ -29,29 +29,23 @@ class DiabetesProfile(Base):
     patient_id = Column(Integer, nullable=True)
     session_id = Column(String, index=True)
     
-    # Status diabetes
-    diabetes_status = Column(String, default="unknown")  # diagnosed, suspected, unknown
-    diabetes_type = Column(String, default="unknown")    # type1, type2, gestational, unknown
+    diabetes_status = Column(String, default="unknown")  
+    diabetes_type = Column(String, default="unknown")    
     
-    # Gejala
     symptoms = Column(JSON, default=list)
     
-    # Data klinis
     blood_sugar_info = Column(String, nullable=True)
     hba1c_info = Column(String, nullable=True)
     medications = Column(JSON, default=list)
     
-    # Kondisi khusus
     wound_info = Column(String, nullable=True)
     has_doctor = Column(Boolean, nullable=True)
     is_pregnant = Column(Boolean, nullable=True)
     
-    # Gaya hidup
     diet_concerns = Column(JSON, default=list)
     exercise_frequency = Column(String, nullable=True)
     
-    # Metadata
-    safety_status = Column(String, default="safe")  # safe, caution, emergency
+    safety_status = Column(String, default="safe")  
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -61,7 +55,7 @@ class Conversation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String, index=True)
-    sender = Column(String)  # user, assistant
+    sender = Column(String)  
     message = Column(Text)
     intent = Column(String, nullable=True)
     red_flags = Column(JSON, default=list)
@@ -75,13 +69,12 @@ class Ticket(Base):
     session_id = Column(String, index=True)
     patient_id = Column(Integer, nullable=True)
     
-    ticket_type = Column(String)  # consultation, emergency, follow_up, wound_care
-    priority = Column(String, default="normal")  # low, normal, high, urgent
+    ticket_type = Column(String)  
+    priority = Column(String, default="normal")  
     summary = Column(Text)
-    status = Column(String, default="open")  # open, in_progress, resolved, closed
+    status = Column(String, default="open")  
     assigned_to = Column(String, nullable=True)
     
-    # WhatsApp handoff
     whatsapp_link = Column(String, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -5,7 +5,6 @@ import numpy as np
 import yaml
 import ollama
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
 from src.config import get_settings
 
 _rag_service_instance = None
@@ -34,7 +33,16 @@ class RAGService:
     def _init_embedding_model(self):
         if self.settings.embedding_provider == "local":
             print(f"Memuat model embedding lokal: {self.settings.embedding_model}...")
-            self.embedder = SentenceTransformer(self.settings.embedding_model, trust_remote_code=True)
+            try:
+                from sentence_transformers import SentenceTransformer
+                self.embedder = SentenceTransformer(self.settings.embedding_model, trust_remote_code=True)
+            except Exception as e:
+                print("Gagal menginisialisasi 'sentence-transformers' (kemungkinan mismatch dependencies, mis. torch/torchvision).")
+                print("Perbaikan cepat:")
+                print(" - Install PyTorch + torchvision CPU wheels (Windows) via:")
+                print("     pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio")
+                print(" - Atau ubah EMBEDDING_PROVIDER di .env menjadi 'ollama' untuk menggunakan Ollama embedding API.")
+                raise RuntimeError(f"Failed to initialize local embedding model: {e}") from e
         else:
             print(f"Menggunakan Ollama API untuk embedding: {self.settings.ollama_embed_model}")
 

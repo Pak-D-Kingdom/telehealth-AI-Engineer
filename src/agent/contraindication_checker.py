@@ -2,21 +2,13 @@ from typing import Dict, Any, List
 
 
 class ContraindicationChecker:
-    """
-    Tool rule-based untuk cek kontraindikasi obat.
-    Ini adalah tool yang dipanggil oleh Prescription Agent.
-    
-    Menggunakan rule-based karena untuk keamanan medis,
-    kita tidak mau LLM "kreatif" dalam menentukan kontraindikasi.
-    """
 
-    # Kontraindikasi absolut per obat
     ABSOLUTE_CONTRAINDICATIONS = {
         "metformin": [
             "gangguan_ginjal_berat",
             "asidosis_metabolik",
             "gagal_jantung_berat",
-            "kehamilan",  # Relatif, tapi hati-hati
+            "kehamilan",
         ],
         "sulfonilurea": [
             "dm_tipe_1",
@@ -24,16 +16,15 @@ class ContraindicationChecker:
             "alergi_sulfonamid",
             "gangguan_ginjal_berat",
         ],
-        "dpp4_inhibitor": [],  # Relatif aman
+        "dpp4_inhibitor": [],
         "sglt2_inhibitor": [
             "egfr_di_bawah_20",
             "ketoasidosis",
             "kehamilan",
         ],
-        "insulin": [],  # Tidak ada kontraindikasi absolut selain alergi
+        "insulin": [],
     }
 
-    # Peringatan (warning) per kondisi pasien
     CONDITION_WARNINGS = {
         "lansia": {
             "sulfonilurea": "Risiko hipoglikemia tinggi pada lansia. Hindari jika memungkinkan.",
@@ -64,16 +55,6 @@ class ContraindicationChecker:
         proposed_medications: List[str],
         patient_conditions: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Cek kontraindikasi untuk list obat yang diusulkan.
-        
-        Args:
-            proposed_medications: List nama obat yang diusulkan
-            patient_conditions: Kondisi pasien (alergi, kehamilan, dll)
-            
-        Returns:
-            Dict hasil pengecekan
-        """
         results = {
             "safe_medications": [],
             "contraindicated": [],
@@ -83,8 +64,7 @@ class ContraindicationChecker:
 
         for med in proposed_medications:
             med_key = self._normalize_med_name(med)
-            
-            # Cek kontraindikasi absolut
+
             contraindications = self._check_absolute(med_key, patient_conditions)
             if contraindications:
                 results["contraindicated"].append({
@@ -93,7 +73,6 @@ class ContraindicationChecker:
                 })
                 continue
 
-            # Cek warnings
             warnings = self._check_warnings(med_key, patient_conditions)
             if warnings:
                 results["warnings"].append({
@@ -103,15 +82,13 @@ class ContraindicationChecker:
 
             results["safe_medications"].append(med)
 
-        # Generate rekomendasi umum
         results["recommendations"] = self._generate_recommendations(patient_conditions)
 
         return results
 
     def _normalize_med_name(self, med: str) -> str:
-        """Normalisasi nama obat ke kategori standar."""
         med_lower = med.lower()
-        
+
         if any(kw in med_lower for kw in ["metformin", "biguanid"]):
             return "metformin"
         elif any(kw in med_lower for kw in ["glibenclamide", "glimepiride", "gliclazide", "sulfonilurea", "sulfonylurea"]):
@@ -122,11 +99,10 @@ class ContraindicationChecker:
             return "sglt2_inhibitor"
         elif any(kw in med_lower for kw in ["insulin", "glargine", "detemir", "aspart", "lispro", "nph", "regular"]):
             return "insulin"
-        
+
         return med_lower
 
     def _check_absolute(self, med_key: str, conditions: Dict) -> List[str]:
-        """Cek kontraindikasi absolut."""
         contraindications = []
         abs_list = self.ABSOLUTE_CONTRAINDICATIONS.get(med_key, [])
 
@@ -151,35 +127,29 @@ class ContraindicationChecker:
         return contraindications
 
     def _check_warnings(self, med_key: str, conditions: Dict) -> List[str]:
-        """Cek warnings berdasarkan kondisi pasien."""
         warnings = []
 
-        # Usia lansia
         if conditions.get("usia", 0) >= 65:
             lansia_warnings = self.CONDITION_WARNINGS.get("lansia", {})
             if med_key in lansia_warnings:
                 warnings.append(f"[Lansia] {lansia_warnings[med_key]}")
 
-        # BMI obesitas
         bmi = conditions.get("bmi")
         if bmi and bmi >= 25:
             obesitas_warnings = self.CONDITION_WARNINGS.get("obesitas", {})
             if med_key in obesitas_warnings:
                 warnings.append(f"[Obesitas] {obesitas_warnings[med_key]}")
 
-        # Kehamilan
         if conditions.get("sedang_hamil"):
             hamil_warnings = self.CONDITION_WARNINGS.get("kehamilan", {})
             if med_key in hamil_warnings:
                 warnings.append(f"[Kehamilan] {hamil_warnings[med_key]}")
 
-        # Gangguan ginjal
         if conditions.get("gangguan_ginjal"):
             ginjal_warnings = self.CONDITION_WARNINGS.get("gangguan_ginjal", {})
             if med_key in ginjal_warnings:
                 warnings.append(f"[Ginjal] {ginjal_warnings[med_key]}")
 
-        # Penyakit kardiovaskular
         if conditions.get("penyakit_kardiovaskular"):
             cv_warnings = self.CONDITION_WARNINGS.get("penyakit_kardiovaskular", {})
             if med_key in cv_warnings:
@@ -188,14 +158,12 @@ class ContraindicationChecker:
         return warnings
 
     def _check_allergy(self, conditions: Dict, allergy_keyword: str) -> bool:
-        """Cek apakah pasien alergi terhadap sesuatu."""
         alergi = conditions.get("alergi", "")
         if not alergi:
             return False
         return allergy_keyword in alergi.lower()
 
     def _generate_recommendations(self, conditions: Dict) -> List[str]:
-        """Generate rekomendasi umum berdasarkan kondisi."""
         recommendations = []
 
         if conditions.get("sedang_hamil"):

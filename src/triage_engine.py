@@ -1,10 +1,4 @@
-# src/triage_engine.py
-
-class TriageEngine:
-    """
-    Menentukan tingkat urgensi dan jalur penanganan berdasarkan kondisi user.
-    """
-    
+class TriageEngine: 
     URGENCY_LEVELS = {
         "emergency": "SEGERA ke IGD/Rumah Sakit",
         "urgent": "Segera konsultasi ke dokter (hari ini)",
@@ -14,18 +8,6 @@ class TriageEngine:
     }
     
     def triage(self, entities: dict, red_flags: list) -> dict:
-        """
-        Menentukan urgensi dan tindakan berdasarkan data user.
-        
-        Returns:
-            {
-                "urgency_level": str,
-                "recommended_action": str,
-                "refer_to": str,
-                "notes": str
-            }
-        """
-        # Level 1: EMERGENCY
         if red_flags:
             return {
                 "urgency_level": "emergency",
@@ -34,7 +16,6 @@ class TriageEngine:
                 "notes": f"Tanda bahaya terdeteksi: {', '.join(red_flags)}. Jangan tunda pertolongan medis."
             }
         
-        # Level 2: URGENT - Luka diabetes yang tidak sembuh
         wound_info = entities.get("wound_info", "")
         if wound_info and any(kw in wound_info.lower() for kw in ["tidak sembuh", "bernanah", "berbau", "hitam"]):
             return {
@@ -44,7 +25,6 @@ class TriageEngine:
                 "notes": "Luka diabetes memerlukan penanganan khusus untuk mencegah infeksi dan komplikasi."
             }
         
-        # Level 3: MODERATE - Gejala baru, belum terdiagnosis
         if entities.get("diabetes_status") == "suspected" and entities.get("symptoms"):
             return {
                 "urgency_level": "moderate",
@@ -53,7 +33,6 @@ class TriageEngine:
                 "notes": "Gejala yang dialami perlu evaluasi medis untuk diagnosis pasti."
             }
         
-        # Level 4: ROUTINE - Sudah terdiagnosis, kontrol rutin
         if entities.get("diabetes_status") == "diagnosed":
             return {
                 "urgency_level": "routine",
@@ -62,7 +41,6 @@ class TriageEngine:
                 "notes": "Pastikan minum obat teratur, jaga pola makan, dan pantau gula darah."
             }
         
-        # Level 5: EDUCATION - Pertanyaan umum
         return {
             "urgency_level": "education",
             "recommended_action": "Edukasi dan informasi umum",

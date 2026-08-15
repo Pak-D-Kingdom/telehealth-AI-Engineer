@@ -10,9 +10,6 @@ from src.rag_service import get_rag_service
 
 
 class PrescriptionDrafter:
-    """
-    AI Agent yang menyusun draf e-resep berdasarkan clinical summary.
-    """
 
     SYSTEM_PROMPT = """Kamu adalah AI Clinical Assistant yang membantu dokter menyusun DRAF resep untuk pasien diabetes.
 
@@ -66,9 +63,8 @@ FORMAT OUTPUT (JSON):
             raise ValueError("GROQ_API_KEY tidak ditemukan!")
 
         self.client = Groq(api_key=settings.groq_api_key)
-        self.model = "llama-3.1-8b-instant"
+        self.model = "llama-3.3-70b-versatile"
 
-        # Tools
         print("PrescriptionDrafter: Initializing ClinicalSummarizer...")
         self.clinical_summarizer = ClinicalSummarizer()
         print("PrescriptionDrafter: ClinicalSummarizer ready")
@@ -80,40 +76,33 @@ FORMAT OUTPUT (JSON):
         print("PrescriptionDrafter: RAGService ready")
 
     def generate_prescription(self, raw_intake: Dict[str, Any]) -> Dict[str, Any]:
-        """Main agent loop dengan detailed logging."""
         print("\n" + "="*60)
         print("PRESCRIPTION AGENT: Starting...")
         print("="*60)
         
         try:
-            # STEP 1: Generate clinical summary
             print("\n[STEP 1] Calling ClinicalSummarizer...")
             clinical_summary = self.clinical_summarizer.generate_summary(raw_intake)
             print("[STEP 1] Clinical summary generated successfully")
             
-            # STEP 2: Extract conditions
             print("\n[STEP 2] Extracting patient conditions...")
             patient_conditions = self._extract_conditions(raw_intake, clinical_summary)
             print(f"[STEP 2] Conditions: {patient_conditions}")
             
-            # STEP 3: Plan candidate medications
             print("\n[STEP 3] Planning candidate medications...")
             candidate_medications = self._plan_candidate_medications(raw_intake, clinical_summary)
             print(f"[STEP 3] Candidates: {candidate_medications}")
             
-            # STEP 4: Check contraindications
             print("\n[STEP 4] Checking contraindications...")
             contraindication_result = self.contraindication_checker.check(
                 candidate_medications, patient_conditions
             )
             print(f"[STEP 4] Contraindication result: {len(contraindication_result.get('contraindicated', []))} contraindicated")
             
-            # STEP 5: Search drug knowledge
             print("\n[STEP 5] Searching drug knowledge base...")
             drug_context = self._search_drug_knowledge(candidate_medications, contraindication_result)
             print(f"[STEP 5] Drug context length: {len(drug_context)} chars")
             
-            # STEP 6: LLM reasoning
             print("\n[STEP 6] Calling LLM for prescription draft...")
             prescription_draft = self._call_llm(
                 clinical_summary,
@@ -122,7 +111,6 @@ FORMAT OUTPUT (JSON):
             )
             print(f"[STEP 6] Prescription draft generated: {type(prescription_draft)}")
             
-            # STEP 7: Build final output
             print("\n[STEP 7] Building final output...")
             final_output = {
                 "prescription_draft": prescription_draft,
@@ -149,7 +137,6 @@ FORMAT OUTPUT (JSON):
             print(f"\n[ERROR] Prescription Agent failed: {str(e)}")
             print(f"Traceback:\n{traceback.format_exc()}")
             
-            # Return error info instead of null
             return {
                 "error": str(e),
                 "traceback": traceback.format_exc(),
@@ -157,7 +144,6 @@ FORMAT OUTPUT (JSON):
             }
 
     def _extract_conditions(self, raw_intake: Dict, summary: Dict) -> Dict[str, Any]:
-        """Ekstrak kondisi pasien untuk contraindication check."""
         conditions = {
             "usia": raw_intake.get("usia", 0),
             "sedang_hamil": raw_intake.get("sedang_hamil", False),
@@ -180,7 +166,6 @@ FORMAT OUTPUT (JSON):
         return conditions
 
     def _plan_candidate_medications(self, raw_intake: Dict, summary: Dict) -> List[str]:
-        """Agent PLANNING: tentukan obat kandidat berdasarkan kondisi."""
         candidates = []
         
         tipe_dm = raw_intake.get("tipe_diabetes", "")
@@ -191,22 +176,18 @@ FORMAT OUTPUT (JSON):
         usia = raw_intake.get("usia", 0)
         riwayat = [r.lower() for r in raw_intake.get("riwayat_penyakit_lain", [])]
 
-        # DM Tipe 1: insulin wajib
         if tipe_dm == "tipe1":
             candidates.append("Insulin Basal (Glargine)")
             return candidates
 
-        # Kehamilan: insulin wajib
         if sedang_hamil:
             candidates.append("Insulin Basal (Glargine)")
             candidates.append("Insulin Rapid-acting (Lispro)")
             return candidates
 
-        # Belum terdiagnosis: edukasi dulu
         if not sudah_terdiagnosis:
             return []
 
-        # DM Tipe 2: algoritma PERKENI
         if "metformin" not in [o.lower() for o in obat_saat_ini]:
             candidates.append("Metformin 500mg")
         
@@ -229,7 +210,6 @@ FORMAT OUTPUT (JSON):
         return candidates if candidates else ["Metformin 500mg"]
 
     def _search_drug_knowledge(self, candidates: List[str], contraindication: Dict) -> str:
-        """Cari info obat dari knowledge base."""
         search_terms = []
         
         for med in candidates:
@@ -261,8 +241,6 @@ FORMAT OUTPUT (JSON):
         contraindication: Dict,
         drug_context: str
     ) -> Dict[str, Any]:
-        """Panggil LLM untuk reasoning dan generate draf resep."""
-        
         prompt = f"""CLINICAL SUMMARY (dari Clinical Summarizer Agent):
 {json.dumps(clinical_summary, ensure_ascii=False, indent=2)}
 
@@ -313,7 +291,6 @@ Output WAJIB JSON sesuai format yang ditentukan."""
             return self._fallback_prescription()
 
     def _fallback_prescription(self) -> Dict[str, Any]:
-        """Fallback jika LLM gagal."""
         return {
             "diagnosis": "Diabetes Melitus (perlu evaluasi lebih lanjut)",
             "treatment_goals": ["Kontrol gula darah", "Pencegahan komplikasi"],

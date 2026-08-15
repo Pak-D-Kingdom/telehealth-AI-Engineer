@@ -8,17 +8,6 @@ from src.rag_service import RAGService
 from src.rag_service import get_rag_service
 
 class ClinicalSummarizer:
-    """
-    AI Agent yang menyusun ringkasan klinis format SOAP.
-    
-    Agent ini:
-    1. Menerima data intake mentah
-    2. Memanggil TriageEngine sebagai tool
-    3. Memanggil Knowledge Base (RAG) sebagai tool
-    4. Menggunakan LLM untuk reasoning & menyusun SOAP
-    5. Output: ringkasan terstruktur untuk dokter
-    """
-
     SYSTEM_PROMPT = """Kamu adalah AI Clinical Assistant untuk dokter spesialis penyakit dalam/endokrinologi.
 
 TUGASMU:
@@ -52,39 +41,28 @@ FORMAT OUTPUT (JSON):
             raise ValueError("GROQ_API_KEY tidak ditemukan!")
         
         self.client = Groq(api_key=settings.groq_api_key)
-        self.model = "llama-3.1-8b-instant"
+        self.model = "llama-3.3-70b-versatile"
         
-        # Tools yang dimiliki agent
         self.triage_engine = TriageEngine()
         self.intake_parser = IntakeParser()
         self.rag_service = get_rag_service()
 
     def generate_summary(self, raw_intake: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Main agent loop: proses intake → panggil tools → generate SOAP.
-        """
-        # STEP 1: Parse intake form
         parsed_intake = self.intake_parser.parse(raw_intake)
         
-        # STEP 2: Call tool - Triage Engine
         triage_result = self.triage_engine.process(raw_intake)
         
-        # STEP 3: Call tool - Knowledge Base (RAG)
-        # Cari info relevan dari knowledge base berdasarkan kondisi pasien
         search_query = self._build_rag_query(parsed_intake, triage_result)
         rag_context = self.rag_service.search(search_query, top_k=3)
         
-        # STEP 4: Build prompt untuk LLM
         agent_prompt = self._build_agent_prompt(
             parsed_intake, 
             triage_result, 
             rag_context
         )
         
-        # STEP 5: LLM reasoning & generate SOAP
         soap_output = self._call_llm(agent_prompt)
         
-        # STEP 6: Gabungkan hasil
         final_output = {
             "patient_info": triage_result["patient_info"],
             "diabetes_info": triage_result["diabetes_info"],
@@ -98,17 +76,11 @@ FORMAT OUTPUT (JSON):
         return final_output
 
     def _build_rag_query(self, intake: Dict, triage: Dict) -> str:
-        """
-        Agent memutuskan query apa yang perlu dicari di knowledge base.
-        Ini adalah bentuk "planning" dari agent.
-        """
         query_parts = []
         
-        # Jika ada gejala spesifik, cari info tentang itu
         if intake.get("gejala"):
             query_parts.append(" ".join(intake["gejala"][:3]))
         
-        # Jika ada warning retinopati, cari info komplikasi mata
         warnings = triage.get("triage_result", {}).get("warnings", [])
         for w in warnings:
             if w.get("type") == "retinopati_awal":
@@ -116,7 +88,6 @@ FORMAT OUTPUT (JSON):
             elif w.get("type") == "neuropati":
                 query_parts.append("neuropati diabetik perawatan")
         
-        # Jika ada red flag, cari info penanganan darurat
         red_flags = triage.get("triage_result", {}).get("red_flags", [])
         for rf in red_flags:
             rf_type = rf.get("type", "")
@@ -125,7 +96,6 @@ FORMAT OUTPUT (JSON):
             elif rf_type == "ketoasidosis":
                 query_parts.append("ketoasidosis diabetik")
         
-        # Default query jika kosong
         if not query_parts:
             if intake.get("sudah_terdiagnosis"):
                 query_parts.append("penatalaksanaan diabetes melitus")
@@ -135,9 +105,6 @@ FORMAT OUTPUT (JSON):
         return " ".join(query_parts[:5])
 
     def _build_agent_prompt(self, intake: Dict, triage: Dict, rag_context: str) -> str:
-        """
-        Susun prompt lengkap untuk LLM dengan semua konteks dari tools.
-        """
         return f"""DATA PASIEN (dari Intake Form):
 {json.dumps(intake, ensure_ascii=False, indent=2)}
 
@@ -152,7 +119,6 @@ Gunakan referensi medis jika relevan. Jika ada red flag, prioritaskan penanganan
 Output WAJIB JSON sesuai format yang ditentukan."""
 
     def _call_llm(self, prompt: str) -> Dict[str, Any]:
-        """Panggil LLM untuk reasoning dan generate SOAP."""
         messages = [
             {"role": "system", "content": self.SYSTEM_PROMPT},
             {"role": "user", "content": prompt}
@@ -169,7 +135,6 @@ Output WAJIB JSON sesuai format yang ditentukan."""
             
             content = response.choices[0].message.content
             
-            # Clean up markdown wrapper jika ada
             if content.startswith("```json"):
                 content = content[7:-3].strip()
             elif content.startswith("```"):
@@ -186,7 +151,6 @@ Output WAJIB JSON sesuai format yang ditentukan."""
             return self._fallback_summary()
 
     def _fallback_summary(self) -> Dict[str, Any]:
-        """Fallback jika LLM gagal."""
         return {
             "soap": {
                 "subjective": "Data intake tersedia, namun summarisasi gagal.",

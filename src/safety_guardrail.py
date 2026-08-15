@@ -1,10 +1,4 @@
 class SafetyGuardrail:
-    """
-    Mendeteksi tanda bahaya (red flags) pada diabetes yang memerlukan
-    penanganan medis segera.
-    """
-    
-    # Kata kunci untuk deteksi darurat
     EMERGENCY_PATTERNS = {
         "hipoglikemia": [
             "gula darah rendah", "gula drop", "gemetar", "keringat dingin",
@@ -40,34 +34,24 @@ class SafetyGuardrail:
         ]
     }
     
-    # Kondisi yang memerlukan perhatian khusus tapi bukan darurat
     CAUTION_PATTERNS = [
         "luka tidak sembuh", "luka lama", "kebas", "mati rasa",
         "kesemutan terus", "hamil gula tinggi", "gula darah naik terus"
     ]
     
     def check(self, message: str) -> tuple:
-        """
-        Periksa pesan untuk red flags.
-        
-        Returns:
-            (is_safe: bool, alert_message: str or None, detected_flags: list)
-        """
         message_lower = message.lower()
         detected_flags = []
         
-        # Cek emergency patterns
         for category, patterns in self.EMERGENCY_PATTERNS.items():
             for pattern in patterns:
                 if pattern in message_lower:
                     detected_flags.append(f"{category}:{pattern}")
         
-        # Jika ada emergency flag, langsung return tidak aman
         if detected_flags:
             alert_message = self._get_emergency_message(detected_flags)
             return False, alert_message, detected_flags
         
-        # Cek caution patterns (bukan darurat tapi perlu perhatian)
         caution_flags = []
         for pattern in self.CAUTION_PATTERNS:
             if pattern in message_lower:
@@ -79,7 +63,6 @@ class SafetyGuardrail:
         return True, None, []
     
     def _get_emergency_message(self, flags: list) -> str:
-        """Buat pesan darurat berdasarkan flags yang terdeteksi."""
         base_message = (
             "Kondisi yang Kakak sebutkan memerlukan penanganan medis SEGERA.\n\n"
         )

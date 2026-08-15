@@ -1,10 +1,4 @@
-# src/diabetes_summarizer.py
-
 class DiabetesSummarizer:
-    """
-    Merangkum profil diabetes user berdasarkan data yang terkumpul selama percakapan.
-    """
-    
     def summarize(self, entities: dict) -> str:
         summary_parts = []
         

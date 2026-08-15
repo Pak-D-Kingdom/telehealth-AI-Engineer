@@ -1,9 +1,4 @@
 class DiabetesEngine:
-    """
-    Business logic untuk rekomendasi dan screening diabetes.
-    """
-    
-    # Tanda bahaya yang memerlukan rujukan segera
     EMERGENCY_KEYWORDS = [
         "pingsan", "tidak sadar", "kejang",
         "keringat dingin", "gemetar hebat",
@@ -15,7 +10,6 @@ class DiabetesEngine:
         "pandangan kabur mendadak", "buta mendadak"
     ]
     
-    # Gejala klasik diabetes
     CLASSIC_SYMPTOMS = [
         "sering kencing", "poliuria", "kencing malam",
         "sering haus", "polidipsia", "haus terus",
@@ -27,7 +21,6 @@ class DiabetesEngine:
         "luka tidak sembuh", "luka lama sembuh"
     ]
     
-    # Nilai referensi gula darah (untuk edukasi, BUKAN diagnosis)
     BLOOD_SUGAR_REFERENCE = {
         "fasting_normal": "< 100 mg/dL",
         "fasting_prediabetes": "100-125 mg/dL",
@@ -41,10 +34,6 @@ class DiabetesEngine:
     }
     
     def detect_emergency(self, message: str) -> tuple:
-        """
-        Mendeteksi tanda darurat dari pesan user.
-        Returns: (is_emergency: bool, detected_flags: list)
-        """
         message_lower = message.lower()
         detected = []
         
@@ -55,9 +44,6 @@ class DiabetesEngine:
         return len(detected) > 0, detected
     
     def detect_classic_symptoms(self, message: str) -> list:
-        """
-        Mendeteksi gejala klasik diabetes dari pesan user.
-        """
         message_lower = message.lower()
         detected = []
         
@@ -68,10 +54,6 @@ class DiabetesEngine:
         return detected
     
     def get_blood_sugar_education(self, value: int, measurement_type: str = "random") -> str:
-        """
-        Memberikan edukasi umum tentang nilai gula darah.
-        BUKAN diagnosis, hanya informasi referensi.
-        """
         if value < 70:
             return (
                 f"Angka {value} mg/dL termasuk RENDAH (hipoglikemia). "
@@ -106,9 +88,6 @@ class DiabetesEngine:
                 )
     
     def get_intake_questions(self, collected_entities: dict) -> list:
-        """
-        Menentukan pertanyaan intake berikutnya berdasarkan data yang sudah terkumpul.
-        """
         questions = []
         
         if not collected_entities.get("diabetes_status"):
@@ -129,9 +108,6 @@ class DiabetesEngine:
         return questions
     
     def get_lifestyle_recommendation(self, diabetes_type: str, symptoms: list) -> list:
-        """
-        Memberikan rekomendasi gaya hidup umum (bukan pengganti saran dokter).
-        """
         recommendations = []
         
         recommendations.append("Konsultasikan pola makan dengan dokter atau ahli gizi.")
