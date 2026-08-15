@@ -4,11 +4,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image";
 import {
   AlertTriangle,
+  ArrowRight,
   BookOpen,
+  Camera,
+  ChevronRight,
+  ImageIcon,
   MessageSquarePlus,
+  Paperclip,
   RefreshCw,
   Send,
   ShoppingCart,
+  Sparkles,
   Stethoscope,
   Syringe,
   X,
@@ -21,13 +27,37 @@ interface ChatSource {
   source: string;
 }
 
+export interface DoctorRef {
+  name: string;
+  specialty: string;
+  experience: string;
+  image?: string;
+  query: string;
+}
+
+export interface ProductRef {
+  id: string;
+  slug: string;
+  name: string;
+  category: string;
+  price: number;
+  image?: string | null;
+  specs?: string | null;
+  description?: string | null;
+}
+
 interface Message {
   id: string;
   sender: "ai" | "user";
   text: string;
+  image?: string;
   timestamp: string;
   sources?: ChatSource[];
+  suggestions?: string[];
+  doctorReferral?: DoctorRef;
+  products?: ProductRef[];
   isEmergency?: boolean;
+  sbarComplete?: boolean;
   isStreaming?: boolean;
   failed?: boolean;
   persisted?: boolean;
@@ -79,6 +109,7 @@ interface ChatBotProps {
 export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -87,6 +118,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
   const [now, setNow] = useState(() => Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const handledInitialQueryRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refreshProviderStatus = useCallback(async () => {
     try {
@@ -214,9 +246,25 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
           animationFrame = undefined;
           flushTokens();
           completed = true;
+
+          const doneData = data as {
+            sessionId?: string;
+            leadComplete?: boolean;
+            isEmergency?: boolean;
+            sbarComplete?: boolean;
+            sources?: ChatSource[];
+            suggestions?: string[];
+            doctorReferral?: DoctorRef;
+            products?: ProductRef[];
+          };
+
           setMessages((previous) => updateMessage(previous, assistantMessageId, {
             isStreaming: false,
             timestamp: formatTime(new Date()),
+            sbarComplete: doneData.sbarComplete,
+            suggestions: Array.isArray(doneData.suggestions) ? doneData.suggestions : undefined,
+            doctorReferral: doneData.doctorReferral,
+            products: Array.isArray(doneData.products) ? doneData.products : undefined,
           }));
         }
       });
@@ -237,20 +285,44 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     }
   }, [refreshProviderStatus]);
 
-  const sendMessage = useCallback(async (rawQuery: string) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setSelectedImage(base64);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const sendMessage = useCallback(async (rawQuery: string, imageBase64?: string | null) => {
     const query = rawQuery.trim();
-    if (!query) return;
+    if (!query && !imageBase64) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       sender: "user",
-      text: query,
+      text: query || (imageBase64 ? "Tolong analisis gambar ini" : ""),
+      image: imageBase64 || undefined,
       timestamp: formatTime(new Date()),
       persisted: false,
     };
 
     setMessages((previous) => [...previous, userMessage]);
-    await streamResponse("/api/chat/stream", { message: query }, userMessage.id);
+    await streamResponse(
+      "/api/chat/stream",
+      { message: query, image: imageBase64 || undefined },
+      userMessage.id,
+    );
   }, [streamResponse]);
 
   useEffect(() => {
@@ -279,9 +351,13 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
   const providerBlocked = isProviderBlocked(providerStatus, now);
 
   const handleSendMessage = (query = input) => {
-    if (isSending || !historyLoaded || failedMessage || providerBlocked || !query.trim()) return;
-    if (query === input) setInput("");
-    void sendMessage(query);
+    if (isSending || !historyLoaded || failedMessage || providerBlocked || (!query.trim() && !selectedImage)) return;
+    const imgToSend = selectedImage;
+    if (query === input) {
+      setInput("");
+      setSelectedImage(null);
+    }
+    void sendMessage(query, imgToSend);
   };
 
   const handleRetry = () => {
@@ -425,17 +501,44 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                           : "pr-4 font-normal text-gray-800"
                     }`}
                   >
+                    {message.image && (
+                      <div className="mb-2 overflow-hidden rounded-xl">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={message.image}
+                          alt="Foto terlampir"
+                          className="max-h-48 rounded-lg object-cover"
+                        />
+                      </div>
+                    )}
                     {message.isEmergency && <AlertTriangle className="mb-2 h-5 w-5" />}
                     {message.isStreaming && !message.text ? (
                       <TypingIndicator />
                     ) : (
                       <p className="whitespace-pre-line">
-                        {message.text}
+                        {message.text.replace(/<SBAR_READY>[\s\S]*/, "")}
                         {message.isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-[#E07A5F] align-middle" />}
                       </p>
                     )}
                     {!message.isStreaming && message.sources && message.sources.length > 0 && (
                       <SourceList sources={message.sources} />
+                    )}
+                    {!message.isStreaming && message.sbarComplete && (
+                      <TriageCard />
+                    )}
+                    {!message.isStreaming && message.doctorReferral && (
+                      <DoctorCard
+                        doctor={message.doctorReferral}
+                        onConsult={(query) => handleSendMessage(query)}
+                        disabled={isSending || providerBlocked}
+                      />
+                    )}
+                    {!message.isStreaming && message.suggestions && message.suggestions.length > 0 && (
+                      <SuggestionChips
+                        suggestions={message.suggestions}
+                        onSelect={(query) => handleSendMessage(query)}
+                        disabled={isSending || providerBlocked}
+                      />
                     )}
                   </div>
                   <span className="px-1 text-[9px] text-gray-400">{message.timestamp}</span>
@@ -468,26 +571,59 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
           </div>
 
           <footer className="shrink-0 space-y-1 border-t border-gray-100 bg-white p-3">
+            {selectedImage && (
+              <div className="relative mb-2 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={selectedImage}
+                  alt="Preview"
+                  className="h-16 w-16 rounded-xl border border-gray-200 object-cover shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedImage(null)}
+                  className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-gray-800 text-white shadow hover:bg-black"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
             <form
               onSubmit={(event) => {
                 event.preventDefault();
                 handleSendMessage();
               }}
-              className="flex items-center gap-2.5"
+              className="flex items-center gap-2"
             >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!historyLoaded || isSending || Boolean(failedMessage) || providerBlocked}
+                title="Unggah Foto Hasil Lab atau Makanan"
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
               <input
                 type="text"
                 value={input}
                 maxLength={2000}
                 disabled={!historyLoaded || isSending || Boolean(failedMessage) || providerBlocked}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder={failedMessage ? "Coba ulang pesan terakhir terlebih dahulu" : "Tanyakan gula darah, gejala, atau diabetes..."}
-                className="flex-1 rounded-full border border-transparent bg-[#F0F2F5] px-4 py-2.5 text-xs text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-gray-300 focus:bg-white disabled:opacity-60 sm:text-sm"
+                placeholder={failedMessage ? "Coba ulang pesan terakhir terlebih dahulu" : selectedImage ? "Tambahkan pertanyaan tentang foto..." : "Tanyakan gula darah, upload lab, atau diet..."}
+                className="flex-1 rounded-full border border-transparent bg-[#F0F2F5] px-4 py-2 text-xs text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-gray-300 focus:bg-white disabled:opacity-60 sm:text-sm"
               />
               <button
                 type="submit"
                 aria-label="Kirim pesan"
-                disabled={!historyLoaded || !input.trim() || isSending || Boolean(failedMessage) || providerBlocked}
+                disabled={!historyLoaded || (!input.trim() && !selectedImage) || isSending || Boolean(failedMessage) || providerBlocked}
                 className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#E07A5F] text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-200"
               >
                 <Send className="h-4 w-4" />
@@ -531,6 +667,72 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
   );
 }
 
+function SuggestionChips({
+  suggestions,
+  onSelect,
+  disabled,
+}: {
+  suggestions: string[];
+  onSelect: (query: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="mt-3 space-y-2 border-t border-gray-200/80 pt-2.5">
+      <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#0D5C46]">
+        <Sparkles className="h-3.5 w-3.5 text-[#E07A5F]" />
+        <span>Rekomendasi pertanyaan lanjutan:</span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {suggestions.map((suggestion, index) => (
+          <button
+            key={index}
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelect(suggestion)}
+            className="group flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-[#0D5C46]/20 bg-emerald-50/70 px-3 py-2 text-left text-xs font-medium text-[#0D5C46] transition-all duration-200 hover:border-[#0D5C46] hover:bg-[#0D5C46] hover:text-white active:scale-98 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span>{suggestion}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DoctorCard({
+  doctor,
+  onConsult,
+  disabled,
+}: {
+  doctor: DoctorRef;
+  onConsult: (query: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-[#0D5C46]/20 bg-emerald-50/40 p-3">
+      <div className="flex items-center gap-3">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#0D5C46]/30">
+          <Image src={doctor.image || "/images/doctor_1.png"} alt={doctor.name} fill className="object-cover" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4 className="truncate text-xs font-bold text-[#0D5C46]">{doctor.name}</h4>
+          <p className="truncate text-[10px] text-gray-600">{doctor.specialty} · {doctor.experience}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onConsult(doctor.query)}
+        className="mt-2.5 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#0D5C46] py-1.5 text-xs font-semibold text-white transition-all hover:bg-[#094232] active:scale-95 disabled:opacity-50"
+      >
+        <Stethoscope className="h-3.5 w-3.5" />
+        <span>Konsultasi Sekarang</span>
+      </button>
+    </div>
+  );
+}
+
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-2 py-1 text-gray-500">
@@ -538,6 +740,24 @@ function TypingIndicator() {
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#E07A5F] [animation-delay:0.2s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#E07A5F] [animation-delay:0.4s]" />
       <span className="ml-1 text-xs text-gray-400">Menyiapkan jawaban...</span>
+    </div>
+  );
+}
+
+function TriageCard() {
+  return (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/50 p-3">
+      <div className="flex items-start gap-2">
+        <div className="rounded-full bg-blue-100 p-1.5 text-blue-600">
+          <BookOpen className="h-4 w-4" />
+        </div>
+        <div>
+          <h4 className="text-xs font-bold text-blue-900">Ringkasan Triase Tersimpan</h4>
+          <p className="mt-0.5 text-[10px] text-blue-700 leading-relaxed">
+            Data keluhan medis awal Anda telah direkam dalam format standar klinis (SBAR). Riwayat ini akan diteruskan ke dokter spesialis saat Anda melakukan konsultasi.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
