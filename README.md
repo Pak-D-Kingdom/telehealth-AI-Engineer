@@ -5,7 +5,7 @@
 - Python `3.10+`
 - FastAPI `0.110+`
 - Uvicorn `0.28+`
-- Groq API (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it`) dengan strategi **Round-Robin Fallback**
+- Groq API (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.6-27b`, `groq/compound`) + OpenRouter Fallback (`meta-llama/llama-3.3-70b-instruct`, `deepseek/deepseek-chat`) dengan strategi **Multi-Provider Fallback**
 - SentenceTransformers (`all-MiniLM-L6-v2` - Gratis/Lokal untuk Vector Search)
 - Supabase `pgvector` (Vector Database)
 - Pydantic & Pydantic Settings `2.6+`

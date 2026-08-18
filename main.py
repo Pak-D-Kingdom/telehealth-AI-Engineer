@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import customer_router, finance_router, ads_router
 from app.services.ingest_service import ingest_service
+from app.agents.finance_agent import finance_agent, FinanceReportRequest
 
 app = FastAPI(
     title="Telehealth AI",
@@ -32,7 +33,7 @@ async def health_check():
         "version": "1.0.0",
         "domain": "diabetes-care",
         "environment": settings.NODE_ENV,
-        "llm_model": settings.GROQ_MODELS[0] if settings.GROQ_MODELS else "llama-3.3-70b-versatile"
+        "llm_model": settings.GROQ_MODELS[0] if settings.GROQ_MODELS else "openai/gpt-oss-120b"
     }
 
 @app.post("/api/v1/ingest", tags=["Admin / Ingest"])
@@ -40,6 +41,15 @@ async def ingest_documents():
     """Trigger manual untuk ingest file .md di folder knowledge_base/ ke Supabase pgvector."""
     result = await ingest_service.ingest_local_storage()
     return result
+
+@app.post("/api/ai/finance-report")
+async def analyze_finance_report(req: FinanceReportRequest):
+    return await finance_agent.analyze(
+        query=req.query,
+        products_count=req.products_count,
+        doctors_count=req.doctors_count
+    )
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,7 +2,7 @@
 
 **Project Name:** `telehealth-ai`  
 **Tech Stack:** Python 3.10+, FastAPI, Uvicorn, Pydantic, Groq API (Multi-Model Round-Robin), Supabase (pgvector), Docker, Docker Compose  
-**LLM & Embedding Providers:** Groq API (Primary: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it` with automatic Rate-Limit Fallback) & SentenceTransformers (Free Local Embedding: `all-MiniLM-L6-v2`)  
+**LLM & Embedding Providers:** Groq API (Primary: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.6-27b`, `groq/compound`) + OpenRouter Fallback (`meta-llama/llama-3.3-70b-instruct`, `deepseek/deepseek-chat`) with automatic Rate-Limit Fallback & SentenceTransformers (Free Local Embedding: `all-MiniLM-L6-v2`)  
 **Primary Domain Focus:** Diabetes Care & Lifestyle Management Platform (GlucoCare)  
 **Integration Target:** `telehealth-backend` (Bun/Express) & `telehealth-frontend` (Next.js)  
 
