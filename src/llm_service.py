@@ -3,7 +3,7 @@ import sqlite3
 import time
 from pathlib import Path
 from datetime import datetime
-from groq import Groq
+from openai import OpenAI
 from src.config import get_settings
 from src.prompt_templates import SYSTEM_PROMPT
 
@@ -11,20 +11,30 @@ from src.prompt_templates import SYSTEM_PROMPT
 class LLMService:
     def __init__(self):
         settings = get_settings()
-        if not settings.groq_api_key:
-            raise ValueError("GROQ_API_KEY tidak ditemukan di file .env!")
+        if not settings.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY tidak ditemukan di file .env!")
         
-        self.client = Groq(
-            api_key=settings.groq_api_key,
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.openrouter_api_key,
             timeout=60.0,
             max_retries=3
         )
-        self.model = "llama-3.3-70b-versatile"
+        
+        self.model = settings.llm_model
+        
+        self.fallback_models = [
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "google/gemma-3-27b-it:free"
+        ]
         
         self.db_path = Path("data/ai_agent.db")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         print(f"AI Agent database initialized at: {self.db_path}")
+        print(f"LLM Model (OpenRouter): {self.model}")
 
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:
@@ -135,7 +145,7 @@ class LLMService:
             history = self.get_session_history(session_id)
         
         if history:
-            messages.extend(history[-6:])
+            messages.extend(history[-10:])
         
         entities_str = json.dumps(entities, ensure_ascii=False, indent=2) if entities else "Belum ada data"
         
@@ -161,9 +171,9 @@ PESAN TERAKHIR YANG KAMU KIRIM KE USER:
 ATURAN KHUSUS UNTUK PESAN INI (WAJIB DITAATI):
 1. User baru saja membalas PESAN TERAKHIR kamu di atas.
 2. JANGAN PERNAH mengulang pertanyaan yang sudah ada di "PESAN TERAKHIR" atau "DATA USER".
-3. Jika user menjawab "tidak", "iya", atau "biasa saja", akui jawabannya secara singkat, lalu LANJUTKAN ke topik yang BENAR-BENAR BARU (misal: riwayat keluarga, status cek gula darah, atau gaya hidup).
-4. JANGAN terjebak hanya menanyakan gejala fisik (seperti lelah/lemas/kesemutan) terus-menerus. Jika sudah tanya 2 gejala, pindah ke riwayat keluarga atau cek lab.
-5. Jika data gejala, riwayat keluarga, dan status cek gula darah sudah terkumpul, BERHENTI BERTANYA dan berikan kesimpulan/rekomendasi.
+3. Jika user menjawab "tidak", "iya", atau "biasa saja", akui jawabannya secara singkat, lalu LANJUTKAN ke topik yang BENAR-BENAR BARU.
+4. JANGAN terjebak hanya menanyakan gejala fisik terus-menerus.
+5. Jika data sudah terkumpul, BERHENTI BERTANYA dan berikan kesimpulan/rekomendasi.
 6. WAJIB update `extracted_entities` berdasarkan jawaban user saat ini.
 
 Pesan User Saat Ini:
@@ -177,16 +187,22 @@ Pesan User Saat Ini:
                  session_id: str = None) -> dict:
         messages = self.build_messages(user_message, context, history, entities, session_id)
         
-        max_attempts = 3
-        for attempt in range(max_attempts):
+        models_to_try = [self.model] + [m for m in self.fallback_models if m != self.model]
+        
+        for model in models_to_try:
             try:
+                print(f"[LLM] Trying model: {model}")
+                
                 response = self.client.chat.completions.create(
-                    model=self.model,
+                    model=model,
                     messages=messages,
                     response_format={"type": "json_object"},
                     temperature=0.3,
                     max_tokens=1024,
-                    timeout=60.0
+                    extra_headers={
+                        "HTTP-Referer": "http://localhost:3000",
+                        "X-Title": "GlucoCare AI Agent"
+                    }
                 )
                 
                 content = response.choices[0].message.content
@@ -214,25 +230,25 @@ Pesan User Saat Ini:
                         red_flags=result.get("red_flags")
                     )
                 
+                print(f"[LLM] ✓ Success with model: {model}")
                 return result
                 
             except json.JSONDecodeError:
-                print(f"JSON Parse Error. Raw: {content[:300]}")
-                return self._fallback_response()
+                print(f"[LLM] JSON Parse Error with model {model}")
+                continue
             except Exception as e:
                 error_msg = str(e)
-                print(f"Attempt {attempt + 1}/{max_attempts} failed: {error_msg}")
+                print(f"[LLM] ✗ Model {model} failed: {error_msg}")
                 
-                if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
-                    if attempt < max_attempts - 1:
-                        wait_time = (attempt + 1) * 2
-                        print(f"Retrying in {wait_time} seconds...")
-                        time.sleep(wait_time)
-                        continue
+                if "404" in error_msg or "not_found" in error_msg:
+                    continue
                 
-                if attempt == max_attempts - 1:
-                    print(f"Error memanggil Groq setelah {max_attempts} attempts: {e}")
-                    return self._fallback_response()
+                if "timeout" in error_msg.lower():
+                    print(f"[LLM] Timeout, retrying in 3 seconds...")
+                    time.sleep(3)
+                    continue
+                
+                return self._fallback_response()
         
         return self._fallback_response()
 
@@ -242,5 +258,6 @@ Pesan User Saat Ini:
             "response_text": "Maaf, saya sedang mengalami kendala teknis. Silakan coba lagi dalam beberapa saat.",
             "red_flags": [],
             "extracted_entities": {},
-            "actions": []
+            "actions": [],
+            "suggested_questions": []
         }

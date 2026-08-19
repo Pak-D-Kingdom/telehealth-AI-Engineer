@@ -17,9 +17,10 @@ def run_test():
     settings = get_settings()
     print(f"[1/4] Konfigurasi .env berhasil dimuat.")
     print(f"      - EMBEDDING_PROVIDER: {settings.embedding_provider}")
+    print(f"      - LLM_MODEL: {settings.llm_model}")
     
-    if not settings.groq_api_key:
-        print("ERROR: GROQ_API_KEY kosong!")
+    if not settings.openrouter_api_key:
+        print("ERROR: OPENROUTER_API_KEY kosong!")
         return
 
     print("\n[2/4] Menginisialisasi RAG Service...")
@@ -39,7 +40,7 @@ def run_test():
     print(context[:300] + "..." if len(context) > 300 else context)
     print("-" * 30)
 
-    print("\n[4/4] Memanggil Groq LLM...")
+    print("\n[4/4] Memanggil OpenRouter LLM...")
     llm = LLMService()
     
     try:

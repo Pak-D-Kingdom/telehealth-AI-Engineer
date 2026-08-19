@@ -1,11 +1,11 @@
 import json
-from typing import Dict, Any, List
-from groq import Groq
+from typing import Dict, Any
+from openai import OpenAI
 from src.config import get_settings
 from src.agent.triage_engine import TriageEngine
 from src.agent.intake_parser import IntakeParser
-from src.rag_service import RAGService
 from src.rag_service import get_rag_service
+
 
 class ClinicalSummarizer:
     SYSTEM_PROMPT = """Kamu adalah AI Clinical Assistant untuk dokter spesialis penyakit dalam/endokrinologi.
@@ -37,11 +37,14 @@ FORMAT OUTPUT (JSON):
 
     def __init__(self):
         settings = get_settings()
-        if not settings.groq_api_key:
-            raise ValueError("GROQ_API_KEY tidak ditemukan!")
+        if not settings.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY tidak ditemukan!")
         
-        self.client = Groq(api_key=settings.groq_api_key)
-        self.model = "llama-3.3-70b-versatile"
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.openrouter_api_key
+        )
+        self.model = settings.llm_model
         
         self.triage_engine = TriageEngine()
         self.intake_parser = IntakeParser()
@@ -49,18 +52,10 @@ FORMAT OUTPUT (JSON):
 
     def generate_summary(self, raw_intake: Dict[str, Any]) -> Dict[str, Any]:
         parsed_intake = self.intake_parser.parse(raw_intake)
-        
         triage_result = self.triage_engine.process(raw_intake)
-        
         search_query = self._build_rag_query(parsed_intake, triage_result)
         rag_context = self.rag_service.search(search_query, top_k=3)
-        
-        agent_prompt = self._build_agent_prompt(
-            parsed_intake, 
-            triage_result, 
-            rag_context
-        )
-        
+        agent_prompt = self._build_agent_prompt(parsed_intake, triage_result, rag_context)
         soap_output = self._call_llm(agent_prompt)
         
         final_output = {
@@ -130,7 +125,11 @@ Output WAJIB JSON sesuai format yang ditentukan."""
                 messages=messages,
                 response_format={"type": "json_object"},
                 temperature=0.3,
-                max_tokens=2000
+                max_tokens=2000,
+                extra_headers={
+                    "HTTP-Referer": "http://localhost:3000",
+                    "X-Title": "GlucoCare AI Agent"
+                }
             )
             
             content = response.choices[0].message.content

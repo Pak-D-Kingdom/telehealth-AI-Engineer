@@ -2,7 +2,7 @@ import json
 import traceback
 from typing import Dict, Any, List
 from datetime import datetime
-from groq import Groq
+from openai import OpenAI
 from src.config import get_settings
 from src.agent.clinical_summarizer import ClinicalSummarizer
 from src.agent.contraindication_checker import ContraindicationChecker
@@ -59,11 +59,14 @@ FORMAT OUTPUT (JSON):
 
     def __init__(self):
         settings = get_settings()
-        if not settings.groq_api_key:
-            raise ValueError("GROQ_API_KEY tidak ditemukan!")
+        if not settings.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY tidak ditemukan!")
 
-        self.client = Groq(api_key=settings.groq_api_key)
-        self.model = "llama-3.3-70b-versatile"
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=settings.openrouter_api_key
+        )
+        self.model = settings.llm_model
 
         print("PrescriptionDrafter: Initializing ClinicalSummarizer...")
         self.clinical_summarizer = ClinicalSummarizer()
@@ -261,13 +264,17 @@ Output WAJIB JSON sesuai format yang ditentukan."""
         ]
 
         try:
-            print(f"  [LLM] Calling Groq API...")
+            print(f"  [LLM] Calling OpenRouter API...")
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 response_format={"type": "json_object"},
                 temperature=0.3,
-                max_tokens=2500
+                max_tokens=2500,
+                extra_headers={
+                    "HTTP-Referer": "http://localhost:3000",
+                    "X-Title": "GlucoCare AI Agent"
+                }
             )
 
             content = response.choices[0].message.content
