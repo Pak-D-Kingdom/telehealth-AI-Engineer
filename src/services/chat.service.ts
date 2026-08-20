@@ -210,21 +210,42 @@ export async function finalizeChatResponse(
   
   // Intelligent Product intent checking
   const explicitProductIntent =
-    lastMsgLower.includes("rekomendasi produk") ||
-    lastMsgLower.includes("rekomendasi obat") ||
-    lastMsgLower.includes("beli obat") ||
-    lastMsgLower.includes("beli alat") ||
-    lastMsgLower.includes("cari obat") ||
-    lastMsgLower.includes("cari suplemen") ||
-    lastMsgLower.includes("obat apa yang") ||
-    lastMsgLower.includes("suplemen apa") ||
-    lastMsgLower.includes("alat cek gula") ||
+    lastMsgLower.includes("produk") ||
+    lastMsgLower.includes("obat") ||
+    lastMsgLower.includes("alat") ||
+    lastMsgLower.includes("beli") ||
+    lastMsgLower.includes("suplemen") ||
     lastMsgLower.includes("glukometer") ||
-    lastMsgLower.includes("strip gula");
+    lastMsgLower.includes("glucometer") ||
+    lastMsgLower.includes("strip") ||
+    lastMsgLower.includes("lancet") ||
+    lastMsgLower.includes("metformin") ||
+    lastMsgLower.includes("gel") ||
+    lastMsgLower.includes("katalog") ||
+    lastMsgLower.includes("apotek") ||
+    replyLower.includes("rekomendasi produk") ||
+    replyLower.includes("alat cek") ||
+    replyLower.includes("glukometer");
 
   let products: ProductRef[] | undefined = undefined;
   if (explicitProductIntent) {
-    const dbProducts = await listProducts({ page: 1, limit: 5 }, true);
+    let searchTerm: string | undefined = undefined;
+    if (lastMsgLower.includes("alat") || lastMsgLower.includes("glukometer") || lastMsgLower.includes("glucometer") || lastMsgLower.includes("strip")) {
+      searchTerm = "gluco";
+    } else if (lastMsgLower.includes("obat") || lastMsgLower.includes("metformin")) {
+      searchTerm = "metformin";
+    } else if (lastMsgLower.includes("suplemen") || lastMsgLower.includes("cinnamon")) {
+      searchTerm = "suplemen";
+    } else if (lastMsgLower.includes("gel") || lastMsgLower.includes("luka")) {
+      searchTerm = "gel";
+    }
+
+    let dbProducts = await listProducts({ page: 1, limit: 4, search: searchTerm }, true);
+    // If specific search had no results, fallback to all active products
+    if (dbProducts.items.length === 0) {
+      dbProducts = await listProducts({ page: 1, limit: 4 }, true);
+    }
+
     if (dbProducts.items.length > 0) {
       products = dbProducts.items.map((p) => ({
         id: p.id,
