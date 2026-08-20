@@ -13,5 +13,7 @@
 🔥 **Supported By**
 
 <p align="center">
+
+ <img src=" https://github.com/Pak-D-Kingdom/telehealth-AI-Engineer/blob/main/data/ayampakd.jpg" width="105" />
   <img src="https://github.com/Pak-D-Kingdom/telehealth-AI-Engineer/blob/main/data/pakd.jpg" width="105" />
 </p>
