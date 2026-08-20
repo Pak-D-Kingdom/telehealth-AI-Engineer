@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { ApiError, apiRequest, streamApiRequest } from "@/lib/api-client";
 import type { ApiResponse } from "@/lib/api-types";
+import { formatRupiah } from "@/lib/formatters";
 
 interface ChatSource {
   title: string;
@@ -526,6 +527,13 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                     {!message.isStreaming && message.sbarComplete && (
                       <TriageCard />
                     )}
+                    {!message.isStreaming && message.products && message.products.length > 0 && (
+                      <ProductCards
+                        products={message.products}
+                        onConsult={(query) => handleSendMessage(query)}
+                        disabled={isSending || providerBlocked}
+                      />
+                    )}
                     {!message.isStreaming && message.doctorReferral && (
                       <DoctorCard
                         doctor={message.doctorReferral}
@@ -729,6 +737,63 @@ function DoctorCard({
         <Stethoscope className="h-3.5 w-3.5" />
         <span>Konsultasi Sekarang</span>
       </button>
+    </div>
+  );
+}
+
+function ProductCards({
+  products,
+  onConsult,
+  disabled,
+}: {
+  products: ProductRef[];
+  onConsult: (query: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center gap-1.5 px-0.5 text-[11px] font-extrabold uppercase tracking-wider text-[#E07A5F]">
+        <ShoppingCart className="h-3.5 w-3.5" />
+        <span>Rekomendasi Produk Terkait</span>
+      </div>
+      <div className="flex gap-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className="flex w-[190px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border border-[#EAE4DC] bg-white p-3 shadow-xs transition-all hover:border-[#0D5C46]/50 hover:shadow-md"
+          >
+            <div>
+              <div className="relative mb-2 aspect-[4/3] w-full overflow-hidden rounded-xl bg-[#F8F6F2] border border-gray-100">
+                <Image
+                  src={product.image || "/images/glucocare_logo.svg"}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute top-1.5 right-1.5 rounded-md bg-[#0D5C46] px-1.5 py-0.5 text-[9px] font-extrabold text-white shadow-xs">
+                  {formatRupiah(product.price)}
+                </div>
+              </div>
+              <span className="block truncate text-[9px] font-extrabold uppercase tracking-wide text-[#E07A5F]">
+                {product.category}
+              </span>
+              <h4 className="line-clamp-1 text-xs font-bold text-[#0D5C46]">{product.name}</h4>
+              {product.specs && (
+                <p className="mt-0.5 line-clamp-1 text-[10px] text-gray-500">{product.specs}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onConsult(`Saya ingin konsultasi atau membeli produk ${product.name}.`)}
+              className="mt-2.5 flex w-full cursor-pointer items-center justify-center gap-1 rounded-xl bg-[#0D5C46] py-1.5 text-[11px] font-bold text-white transition-all hover:bg-[#094232] active:scale-95 disabled:opacity-50"
+            >
+              <span>Konsultasi Produk</span>
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
