@@ -123,3 +123,68 @@ export interface DoctorInput {
   isActive?: boolean;
   categoryIds: string[];
 }
+
+export type ReportChartType = "bar" | "line" | "doughnut" | "table" | "ranking";
+
+export interface ReportChartDataPoint {
+  label: string;
+  value: number;
+  secondaryValue?: number;
+  secondaryLabel?: string;
+  color?: string;
+  percentage?: number;
+  formattedValue?: string;
+}
+
+export interface ReportTableColumn {
+  key: string;
+  label: string;
+  align?: "left" | "center" | "right";
+}
+
+export interface ReportKPI {
+  label: string;
+  value: string | number;
+  change?: string;
+  trend?: "up" | "down" | "neutral";
+  description?: string;
+}
+
+export interface ReportKeyTakeaway {
+  title: string;
+  description: string;
+  type: "positive" | "warning" | "neutral" | "danger";
+}
+
+export interface ReportRecommendation {
+  action: string;
+  impact: "Tinggi" | "Sedang" | "Rendah";
+  department: string;
+}
+
+export interface AdminAiReportResult {
+  title: string;
+  summary: string;
+  timeRange: string;
+  chartType: ReportChartType;
+  dimensionLabel?: string;
+  metricLabel?: string;
+  secondaryMetricLabel?: string;
+  unit?: string;
+  chartData?: ReportChartDataPoint[];
+  tableColumns?: ReportTableColumn[];
+  tableRows?: Record<string, string | number | boolean | null>[];
+  kpis?: ReportKPI[];
+  takeaways?: ReportKeyTakeaway[];
+  recommendations?: ReportRecommendation[];
+  sqlQueryUsed?: string;
+  tablesReferenced?: string[];
+  generatedAt: string;
+  confidenceScore: number;
+}
+
+export interface AdminAiReportQueryRequest {
+  query: string;
+  timeRange?: "7d" | "30d" | "90d" | "all";
+}
+

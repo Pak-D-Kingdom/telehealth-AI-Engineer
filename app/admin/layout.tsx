@@ -11,6 +11,7 @@ import {
   Stethoscope,
   LogOut,
   MessageSquareText,
+  Sparkles,
   Menu,
   X,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/admin/produk", label: "Produk & Alat", icon: Package },
   { href: "/admin/dokter", label: "Dokter Spesialis", icon: Stethoscope },
   { href: "/admin/chat", label: "Chat & Lead", icon: MessageSquareText },
+  { href: "/admin/report", label: "AI Report", icon: Sparkles },
 ];
 
 function AdminShell({ children }: { children: React.ReactNode }) {
