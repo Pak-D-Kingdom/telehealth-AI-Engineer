@@ -1,48 +1,6 @@
-# Environment
+node_modules/
+src/generated/prisma/
 .env
 .env.*
 !.env.example
-
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Virtual environments
-.env
-.venv/
-venv/
-env/
-ENV/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Local databases and generated data
-data/*.db
-data/*.sqlite
-data/*.sqlite3
-data/exports/
-notebooks/data/outputs/
-
-# Generated vector indexes
-faiss_index/*.faiss
-faiss_index/*.index
-faiss_index/metadata.json
-
-# Logs
-*.log
-logs/
-
-# OS/editor
 .DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
