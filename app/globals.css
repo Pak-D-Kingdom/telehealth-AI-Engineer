@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-red-hat), "Red Hat Text", system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  --background: #FAF8F5;
+  --foreground: #1A1A1A;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(45, 74, 62, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(45, 74, 62, 0.5);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+.form-input {
+  width: 100%;
+  border: 1px solid #DDD8D0;
+  border-radius: 0.75rem;
+  background: #FAF8F5;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.form-input:focus {
+  border-color: #0D5C46;
+  box-shadow: 0 0 0 3px rgb(13 92 70 / 0.2);
+}
