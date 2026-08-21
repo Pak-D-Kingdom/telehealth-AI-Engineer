@@ -17,6 +17,7 @@ import {
   Scale,
   MessageCircle,
 } from "lucide-react";
+import FormattedMarkdown from "./FormattedMarkdown";
 
 const AI_AGENT_URL =
   process.env.NEXT_PUBLIC_AI_AGENT_URL || "http://localhost:8000";
@@ -704,7 +705,7 @@ export default function ChatBot({
                         : "text-gray-800 font-normal pr-4"
                     }`}
                   >
-                    <p className="whitespace-pre-line">{msg.text}</p>
+                    <FormattedMarkdown content={msg.text} isUser={msg.sender === "user"} />
                   </div>
                 )}
 

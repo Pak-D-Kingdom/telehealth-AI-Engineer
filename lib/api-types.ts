@@ -123,3 +123,130 @@ export interface DoctorInput {
   isActive?: boolean;
   categoryIds: string[];
 }
+
+// -------------------------------------------------------------
+// AI Finance & Lead Scoring CRM Types
+// -------------------------------------------------------------
+
+export interface CategoryValuation {
+  category: string;
+  count: number;
+  averagePrice: number;
+  totalCatalogValue: number;
+}
+
+export interface FinancialInsightsData {
+  catalogSummary: {
+    totalActiveProducts: number;
+    totalCatalogValue: number;
+    averageProductPrice: number;
+    categoryBreakdown: CategoryValuation[];
+  };
+  pipelineSummary: {
+    totalLeads: number;
+    qualifiedLeads: number;
+    estimatedPipelineRevenue: number;
+    averageLeadPotentialValue: number;
+    highIntentLeadsCount: number;
+  };
+  executiveSummary: {
+    overview: string;
+    keyOpportunities: string[];
+    bundlingRecommendations: string[];
+    actionableAdvice: string;
+  };
+  generatedAt: string;
+}
+
+export interface FinanceQueryData {
+  answer: string;
+  relatedMetrics?: {
+    totalPipelineRevenue: number;
+    totalLeads: number;
+  };
+}
+
+export type LeadTier = "HOT" | "WARM" | "COLD";
+
+export interface LeadScoreFactors {
+  contactCompleteness: number;
+  complaintUrgency: number;
+  clinicalRelevance: number;
+  engagementScore: number;
+}
+
+export interface ScoredLead {
+  leadId: string;
+  sessionId: string;
+  patientName: string;
+  whatsapp: string | null;
+  diabetesType: string | null;
+  primaryComplaint: string | null;
+  currentMedication: string | null;
+  totalScore: number;
+  tier: LeadTier;
+  factors: LeadScoreFactors;
+  recommendedProducts: string[];
+  recommendedSpecialist: string;
+  conversionSummary: string;
+  whatsAppDraft: string;
+  whatsAppLink: string | null;
+  scoredAt: string;
+}
+
+export interface LeadBatchScoresData {
+  stats: {
+    total: number;
+    hot: number;
+    warm: number;
+    cold: number;
+    averageScore: number;
+  };
+  leads: ScoredLead[];
+}
+
+// -------------------------------------------------------------
+// AI Pharmacy Inventory & Restock Forecasting Types
+// -------------------------------------------------------------
+
+export type StockStatus = "CRITICAL_REFILL" | "REORDER_RECOMMENDED" | "HEALTHY";
+
+export interface ProductInventoryItem {
+  productId: string;
+  productName: string;
+  category: string;
+  price: number;
+  estimatedCurrentStock: number;
+  dailyDemandRate: number;
+  runoutDays: number;
+  stockStatus: StockStatus;
+  recommendedReorderQty: number;
+  estimatedReorderCost: number;
+  demandSignalReasons: string[];
+}
+
+export interface InventoryForecastData {
+  summary: {
+    totalProductsTracked: number;
+    criticalItemsCount: number;
+    reorderRecommendedCount: number;
+    healthyItemsCount: number;
+    totalEstimatedReorderBudget: number;
+    fastestDepletingProduct: string;
+  };
+  items: ProductInventoryItem[];
+  aiExecutiveAdvice: {
+    procurementSummary: string;
+    priorityActions: string[];
+    supplierStrategy: string;
+  };
+  generatedAt: string;
+}
+
+export interface InventoryQueryData {
+  answer: string;
+  relatedMetrics?: {
+    criticalCount: number;
+    totalBudget: number;
+  };
+}

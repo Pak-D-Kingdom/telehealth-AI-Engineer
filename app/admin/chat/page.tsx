@@ -9,7 +9,17 @@ import {
   MessageSquareText,
   Search,
   UserRound,
+  Sparkles,
+  Flame,
+  Zap,
+  Snowflake,
+  ExternalLink,
+  Copy,
+  Check,
+  Stethoscope,
+  Package,
 } from "lucide-react";
+import FormattedMarkdown from "@/components/FormattedMarkdown";
 import { ApiError, apiFetcher, apiRequest } from "@/lib/api-client";
 import type {
   AdminChatDetail,
@@ -18,6 +28,8 @@ import type {
   ApiResponse,
   ChatSessionStatus,
   LeadQualificationStatus,
+  LeadBatchScoresData,
+  ScoredLead,
   PaginationMeta,
 } from "@/lib/api-types";
 
@@ -45,6 +57,7 @@ export default function AdminChatPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [copiedDraft, setCopiedDraft] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page), limit: "20" });
@@ -63,11 +76,20 @@ export default function AdminChatPage() {
   } = useSWR<ListResponse>(`/api/admin/chat/sessions?${query}`, apiFetcher, {
     revalidateOnFocus: false,
   });
+
   const { data: statsResponse, mutate: mutateStats } = useSWR<ApiResponse<AdminChatStats>>(
     "/api/admin/chat/stats",
     apiFetcher,
     { revalidateOnFocus: false },
   );
+
+  // SWR for AI Batch Lead Scores
+  const { data: leadScoresResponse } = useSWR<ApiResponse<LeadBatchScoresData>>(
+    "/api/ai/leads/batch-scores",
+    apiFetcher,
+    { revalidateOnFocus: false },
+  );
+
   const {
     data: detailResponse,
     error: detailError,
@@ -83,6 +105,20 @@ export default function AdminChatPage() {
   const meta = listResponse?.meta;
   const detail = detailResponse?.data;
   const stats = statsResponse?.data;
+
+  // Create a map for quick lookup of lead scores
+  const scoreMap = useMemo(() => {
+    const map = new Map<string, ScoredLead>();
+    if (leadScoresResponse?.data?.leads) {
+      for (const lead of leadScoresResponse.data.leads) {
+        if (lead.leadId) map.set(lead.leadId, lead);
+        if (lead.sessionId) map.set(lead.sessionId, lead);
+      }
+    }
+    return map;
+  }, [leadScoresResponse]);
+
+  const selectedLeadScore = detail ? (scoreMap.get(detail.id) || (detail.lead?.id ? scoreMap.get(detail.lead.id) : undefined)) : undefined;
 
   const updateSession = async (input: {
     status?: ChatSessionStatus;
@@ -108,12 +144,18 @@ export default function AdminChatPage() {
     }
   };
 
+  const handleCopyDraft = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedDraft(true);
+    setTimeout(() => setCopiedDraft(false), 2000);
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Chat & Lead</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Chat & Lead CRM Intelligence</h1>
         <p className="mt-1 text-sm text-[#6B7C72]">
-          Tinjau percakapan chatbot, kondisi darurat, dan data calon pasien.
+          Tinjau percakapan chatbot, penilaian prioritas AI Lead Scoring, dan penjangkauan WhatsApp pasien.
         </p>
       </div>
 
@@ -190,39 +232,46 @@ export default function AdminChatPage() {
 
       <div className="grid min-h-[560px] overflow-hidden rounded-2xl border border-[#EAE4DC] bg-white lg:grid-cols-[360px_1fr]">
         <section className="border-b border-[#EAE4DC] lg:border-b-0 lg:border-r">
-          <div className="border-b border-[#EAE4DC] px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#6B7C72]">
-            {meta ? `${meta.total} session` : "Session chatbot"}
+          <div className="border-b border-[#EAE4DC] px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#6B7C72] flex items-center justify-between">
+            <span>{meta ? `${meta.total} session` : "Session chatbot"}</span>
+            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">AI Scored</span>
           </div>
-          <div className="max-h-[620px] divide-y divide-[#F2ECE4] overflow-y-auto">
-            {sessions.map((session) => (
-              <button
-                key={session.id}
-                type="button"
-                onClick={() => {
-                  setActionError(null);
-                  setSelectedId(session.id);
-                }}
-                className={`w-full cursor-pointer p-4 text-left transition-colors ${
-                  selectedId === session.id ? "bg-[#0D5C46]/5" : "hover:bg-[#FAF8F5]"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-[#1A2421]">
-                      {session.lead?.name || "Pengunjung anonim"}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-[#6B7C72]">
-                      {session.lead?.whatsapp || `${session.messageCount} pesan`}
-                    </p>
+          <div className="max-h-[640px] divide-y divide-[#F2ECE4] overflow-y-auto">
+            {sessions.map((session) => {
+              const leadScore = scoreMap.get(session.id) || (session.lead?.id ? scoreMap.get(session.lead.id) : undefined);
+              return (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => {
+                    setActionError(null);
+                    setSelectedId(session.id);
+                  }}
+                  className={`w-full cursor-pointer p-4 text-left transition-colors ${
+                    selectedId === session.id ? "bg-[#0D5C46]/5" : "hover:bg-[#FAF8F5]"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-[#1A2421]">
+                        {session.lead?.name || "Pengunjung anonim"}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-[#6B7C72]">
+                        {session.lead?.whatsapp || `${session.messageCount} pesan`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {leadScore && <LeadTierBadge tier={leadScore.tier} score={leadScore.totalScore} />}
+                      {session.isEmergency && <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />}
+                    </div>
                   </div>
-                  {session.isEmergency && <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <StatusBadge status={session.status} />
-                  <time className="text-[10px] text-[#8A978F]">{formatDate(session.updatedAt)}</time>
-                </div>
-              </button>
-            ))}
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <StatusBadge status={session.status} />
+                    <time className="text-[10px] text-[#8A978F]">{formatDate(session.updatedAt)}</time>
+                  </div>
+                </button>
+              );
+            })}
             {listLoading && <p className="p-8 text-center text-sm text-[#6B7C72]">Memuat session...</p>}
             {!listLoading && sessions.length === 0 && (
               <p className="p-8 text-center text-sm text-[#6B7C72]">Tidak ada session sesuai filter.</p>
@@ -257,7 +306,7 @@ export default function AdminChatPage() {
           {!selectedId && (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center p-8 text-center text-[#6B7C72]">
               <MessageSquareText className="mb-3 h-9 w-9 text-[#0D5C46]/40" />
-              <p className="text-sm font-semibold">Pilih session untuk melihat histori dan data lead.</p>
+              <p className="text-sm font-semibold">Pilih session untuk melihat histori, skor AI, dan data lead.</p>
             </div>
           )}
           {selectedId && detailLoading && (
@@ -267,14 +316,20 @@ export default function AdminChatPage() {
             <p className="m-6 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-600">{detailError.message}</p>
           )}
           {detail && (
-            <div className="flex h-full max-h-[720px] flex-col">
-              <div className="space-y-4 border-b border-[#EAE4DC] p-5">
+            <div className="flex h-full max-h-[750px] flex-col">
+              <div className="space-y-4 border-b border-[#EAE4DC] p-5 overflow-y-auto max-h-[360px]">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <UserRound className="h-4 w-4 text-[#0D5C46]" />
                       <h2 className="font-bold text-[#1A2421]">{detail.lead?.name || "Pengunjung anonim"}</h2>
                       {detail.isEmergency && <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">DARURAT</span>}
+                      {selectedLeadScore && (
+                        <span className="text-xs font-bold text-[#0D5C46] bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          Skor AI: {selectedLeadScore.totalScore}/100 ({selectedLeadScore.tier})
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-[#6B7C72]">Dibuat {formatDate(detail.createdAt)}</p>
                   </div>
@@ -309,13 +364,75 @@ export default function AdminChatPage() {
                     <LeadField label="Keluhan Utama" value={detail.lead?.primaryComplaint} />
                   </div>
                 </div>
+
+                {/* AI CRM Intelligence & 1-Click WhatsApp Card */}
+                {selectedLeadScore && (
+                  <div className="rounded-xl border border-[#0D5C46]/20 bg-gradient-to-br from-emerald-50/50 via-white to-[#FAF8F5] p-4 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#0D5C46]">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        AI Lead Recommendation & WhatsApp Outreach
+                      </div>
+                      <span className="text-[11px] font-semibold text-[#5A6E63]">
+                        {selectedLeadScore.conversionSummary}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-[#3A4F46]">
+                        <Stethoscope className="w-3.5 h-3.5 text-[#0D5C46] shrink-0" />
+                        <span className="font-bold">Rujukan:</span> {selectedLeadScore.recommendedSpecialist}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[#3A4F46]">
+                        <Package className="w-3.5 h-3.5 text-[#E07A5F] shrink-0" />
+                        <span className="font-bold">Produk:</span> {selectedLeadScore.recommendedProducts.join(", ")}
+                      </div>
+                    </div>
+
+                    {/* WhatsApp Draft Preview & 1-Click Actions */}
+                    <div className="pt-2 border-t border-[#0D5C46]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-semibold text-[#4A5D53] line-clamp-2 italic bg-white p-2 rounded-lg border border-[#EAE4DC]">
+                          "{selectedLeadScore.whatsAppDraft}"
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyDraft(selectedLeadScore.whatsAppDraft)}
+                          className="cursor-pointer flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#EAE4DC] bg-white text-xs font-bold text-[#3A4F46] hover:bg-gray-50 transition-colors"
+                        >
+                          {copiedDraft ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" /> Tersalin
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-[#8A978F]" /> Salin Teks
+                            </>
+                          )}
+                        </button>
+                        {selectedLeadScore.whatsAppLink && (
+                          <a
+                            href={selectedLeadScore.whatsAppLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] text-white text-xs font-bold hover:bg-[#1EBE5D] transition-colors shadow-xs"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> Buka WhatsApp (1-Klik)
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto bg-[#FCFBF9] p-5">
                 {detail.messages.map((message) => (
                   <div key={message.id} className={message.role === "USER" ? "flex justify-end" : "flex justify-start"}>
                     <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === "USER" ? "rounded-tr-sm bg-[#0D5C46] text-white" : "rounded-tl-sm border border-[#EAE4DC] bg-white text-[#1A2421]"}`}>
-                      <p className="whitespace-pre-line">{message.content}</p>
+                      <FormattedMarkdown content={message.content} isUser={message.role === "USER"} />
                       {message.sources && message.sources.length > 0 && (
                         <p className="mt-2 border-t border-[#EAE4DC] pt-2 text-[10px] text-[#6B7C72]">
                           Sumber: {message.sources.map((source) => source.title).join(", ")}
@@ -334,6 +451,28 @@ export default function AdminChatPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function LeadTierBadge({ tier, score }: { tier: "HOT" | "WARM" | "COLD"; score: number }) {
+  if (tier === "HOT") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-700 border border-red-200">
+        <Flame className="w-3 h-3 text-red-600 animate-pulse" /> HOT ({score})
+      </span>
+    );
+  }
+  if (tier === "WARM") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-200">
+        <Zap className="w-3 h-3 text-amber-600" /> WARM ({score})
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
+      <Snowflake className="w-3 h-3 text-blue-500" /> COLD ({score})
+    </span>
   );
 }
 
