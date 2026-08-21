@@ -10,6 +10,7 @@ import { ClinicalService } from "../services/clinical.service";
 import { FinanceAgent } from "../services/agents/finance.agent";
 import { LeadScoringAgent } from "../services/agents/lead-scoring.agent";
 import { InventoryAgent } from "../services/agents/inventory.agent";
+import { MealPlannerAgent } from "../services/agents/meal-planner.agent";
 
 export async function analyzeGlucoseTrends(req: Request, res: Response, next: NextFunction) {
   try {
@@ -153,3 +154,17 @@ export async function queryInventoryAdvisor(req: Request, res: Response, next: N
     next(error);
   }
 }
+
+// -------------------------------------------------------------
+// Free User AI Agent: Daily Meal & Carb Planner Generator
+// -------------------------------------------------------------
+
+export async function generateMealPlan(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await MealPlannerAgent.generateMealPlan(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+

@@ -14,6 +14,7 @@ import {
   getBatchLeadScores,
   getInventoryForecast,
   queryInventoryAdvisor,
+  generateMealPlan,
 } from "../controllers/ai.controller";
 
 const router = Router();
@@ -29,6 +30,9 @@ router.post("/food/analyze", analyzeFood);
 router.post("/food/compare", compareFood);
 router.post("/analyze", analyzeFood);
 router.post("/compare", compareFood);
+
+// Free Patient Lifestyle & Daily Carb Meal Planner
+router.post("/meal-plan/generate", generateMealPlan);
 
 // Clinical Summaries & Prescription (Doctor Portal AI)
 router.post("/clinical/summary", generateClinicalSummary);
