@@ -8,6 +8,12 @@ import {
   compareFood,
   generateClinicalSummary,
   generatePrescriptionDraft,
+  getFinancialInsights,
+  queryFinanceAdvisor,
+  getLeadScore,
+  getBatchLeadScores,
+  getInventoryForecast,
+  queryInventoryAdvisor,
 } from "../controllers/ai.controller";
 
 const router = Router();
@@ -27,5 +33,15 @@ router.post("/compare", compareFood);
 // Clinical Summaries & Prescription (Doctor Portal AI)
 router.post("/clinical/summary", generateClinicalSummary);
 router.post("/clinical/prescription-draft", generatePrescriptionDraft);
+
+// Admin Business, Finance & CRM Lead Intelligence Agents
+router.get("/finance/insights", getFinancialInsights);
+router.post("/finance/query", queryFinanceAdvisor);
+router.get("/leads/score/:id", getLeadScore);
+router.get("/leads/batch-scores", getBatchLeadScores);
+
+// Admin Pharmacy Inventory & Restock Forecasting Agents
+router.get("/inventory/forecast", getInventoryForecast);
+router.post("/inventory/query", queryInventoryAdvisor);
 
 export { router as aiRouter };
