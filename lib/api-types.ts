@@ -250,3 +250,54 @@ export interface InventoryQueryData {
     totalBudget: number;
   };
 }
+
+// -------------------------------------------------------------
+// Free User AI Agent: Daily Meal & Carb Planner Types
+// -------------------------------------------------------------
+
+export type DiabetesTypeOption = "TIPE_2" | "TIPE_1" | "PRA_DIABETES" | "GESTASIONAL" | "UMUM";
+export type DietaryPreferenceOption = "hemat" | "standar" | "bebas_santan" | "vegetarian" | "rendah_garam";
+
+export interface MealPlanInput {
+  diabetesType?: DiabetesTypeOption;
+  calorieTarget?: number;
+  dietaryPreferences?: DietaryPreferenceOption;
+  allergiesOrDislikes?: string;
+}
+
+export interface MealItem {
+  mealType: "SARAPAN" | "SNACK_PAGI" | "MAKAN_SIANG" | "SNACK_SORE" | "MAKAN_MALAM";
+  timeRecommendation: string;
+  menuName: string;
+  portion: string;
+  carbsGrams: number;
+  proteinGrams: number;
+  calories: number;
+  glycemicIndex: "RENDAH" | "SEDANG" | "TINGGI";
+  tips: string;
+}
+
+export interface DailyPlanSummary {
+  totalCalories: number;
+  totalCarbsGrams: number;
+  totalProteinGrams: number;
+  totalFiberGrams: number;
+  glycemicImpact: "RENDAH" | "SEDANG" | "TINGGI";
+  nutritionAdvice: string;
+  eatingSequenceTip: string;
+}
+
+export interface ProPlanPreview {
+  bannerTitle: string;
+  bannerDesc: string;
+  ctaText: string;
+  features: string[];
+}
+
+export interface MealPlanData {
+  dailyPlanSummary: DailyPlanSummary;
+  meals: MealItem[];
+  proPlanPreview: ProPlanPreview;
+  generatedAt: string;
+}
+

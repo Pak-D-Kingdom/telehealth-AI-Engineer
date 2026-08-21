@@ -10,6 +10,7 @@ import Dermatologists from "@/components/Dermatologists";
 import TrustBar from "@/components/TrustBar";
 import Footer from "@/components/Footer";
 import ChatBot from "@/components/ChatBot";
+import MealPlannerWidget from "@/components/MealPlannerWidget";
 
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -33,6 +34,7 @@ export default function Home() {
           <TrustBar />
           <SkinIssues onOpenChat={handleOpenChat} />
           <HowItWorks onOpenChat={handleOpenChat} />
+          <MealPlannerWidget />
           <ProductsShowcase onOpenChat={handleOpenChat} />
           <Dermatologists onOpenChat={handleOpenChat} />
         </main>

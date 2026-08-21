@@ -62,13 +62,30 @@ docker compose version
 
 Buka `http://localhost:3000` untuk aplikasi publik atau `http://localhost:3000/admin/login` untuk dashboard admin. Kredensial development mengikuti `ADMIN_EMAIL` dan `ADMIN_PASSWORD` pada file `.env` backend.
 
+## Fitur AI & Antarmuka Cerdas GlucoCare
+
+Frontend ini mengintegrasikan seluruh ekosistem AI terdistribusi dari backend:
+
+### 1. Fitur AI untuk Pasien & Pengguna Publik (Public Tools)
+- **AI Diabetes Daily Meal & Carb Planner (`/`)**: Generator rencana menu makan 1 hari ramah gula darah (target kalori, gram karbohidrat, urutan makan, dan teaser paket langganan GlucoCare Pro).
+- **Multimodal AI Food Vision (`ChatBot.tsx`)**: Analisis visual foto makanan dan komparasi 2 menu makanan secara langsung di chatbot.
+- **RAG Conversational Health Chatbot (`ChatBot.tsx`)**: Konsultasi diabetes 24/7 berbasis referensi terverifikasi dengan guardrails medis.
+
+### 2. Fitur AI untuk Admin & Manajemen Telehealth (Admin Portal)
+- **AI Finance & Revenue Intelligence (`/admin`)**: Analisis valuasi katalog produk, proyeksi omset pipeline, dan asisten finansial interaktif.
+- **AI Lead Scoring CRM & WhatsApp Outreach (`/admin/chat`)**: Skor prospek (0–100), klasifikasi tier (`HOT/WARM/COLD`), dan tautan WhatsApp 1-Klik.
+- **AI Pharmacy Inventory & Restock Forecasting (`/admin/produk`)**: Pemantauan stok fisik, peramalan sisa hari stok (Runout Days), dan rekomendasi pesanan ulang (EOQ).
+- **Clean Markdown & Table Parser (`FormattedMarkdown.tsx`)**: Rendering tipografi bersih tanpa simbol mentah dan tabel data responsif.
+
 ## Integrasi Backend
 
 Frontend menggunakan API berikut:
 
 - katalog publik: `/api/products`, `/api/doctors`, dan `/api/doctor-categories`
+- perencana makan AI gratis: `POST /api/ai/meal-plan/generate`
 - autentikasi admin: `/api/auth/login`, `/api/auth/me`, dan `/api/auth/logout`
 - dashboard admin: `/api/admin/products`, `/api/admin/doctors`, serta endpoint CRUD produk dan dokter
+- intelligence AI admin: `/api/ai/finance/insights`, `/api/ai/finance/query`, `/api/ai/leads/batch-scores`, `/api/ai/inventory/forecast`, `/api/ai/inventory/query`
 - dashboard chat/lead: `/api/admin/chat/stats` dan `/api/admin/chat/sessions`
 - chatbot: `POST /api/chat`, `GET /api/chat`, dan `DELETE /api/chat`
 
