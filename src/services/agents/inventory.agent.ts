@@ -71,11 +71,11 @@ export class InventoryAgent {
    */
   static async generateInventoryForecast(): Promise<InventoryForecastResult> {
     // 1. Fetch Products (with resilient fallback)
-    let products: Array<{ id: string; name: string; category: string; price: number }> = [];
+    let products: Array<{ id: string; name: string; category: string; price: number; specs?: string | null }> = [];
     try {
       products = await prisma.product.findMany({
         where: { isActive: true },
-        select: { id: true, name: true, category: true, price: true },
+        select: { id: true, name: true, category: true, price: true, specs: true },
       });
       if (products.length === 0) products = FALLBACK_PRODUCTS_INVENTORY;
     } catch (err) {
@@ -140,9 +140,18 @@ export class InventoryAgent {
       const baseDailyDemand = 1.8 + (idx % 3) * 0.8;
       const dailyDemandRate = Math.round(baseDailyDemand * demandMultiplier * 10) / 10;
 
-      // Simulated current stock level
-      const estimatedCurrentStock = Math.max(5, 45 - (idx * 9) + (glucoseSignals > 3 && idx === 0 ? -12 : 0));
-      const runoutDays = Math.max(1, Math.round(estimatedCurrentStock / (dailyDemandRate || 1)));
+      // Extract actual physical stock from product specs metadata (e.g. "Stok: 50 unit | ...")
+      let estimatedCurrentStock = Math.max(5, 45 - (idx * 9) + (glucoseSignals > 3 && idx === 0 ? -12 : 0));
+      if (p.specs) {
+        const stockMatch = p.specs.match(/(?:stok|stock|qty|jumlah)\s*[:=]\s*(\d+)/i);
+        if (stockMatch && stockMatch[1]) {
+          estimatedCurrentStock = Math.max(0, parseInt(stockMatch[1], 10));
+        }
+      }
+
+      const runoutDays = estimatedCurrentStock === 0
+        ? 0
+        : Math.max(1, Math.round(estimatedCurrentStock / (dailyDemandRate || 1)));
 
       let stockStatus: StockStatus = "HEALTHY";
       if (runoutDays <= 7) {
