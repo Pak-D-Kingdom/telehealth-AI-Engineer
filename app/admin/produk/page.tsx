@@ -19,10 +19,10 @@ import {
   Truck,
   Coins,
 } from "lucide-react";
-import FormattedMarkdown from "@/components/FormattedMarkdown";
 import { ApiError, apiFetcher, apiRequest } from "@/lib/api-client";
 import { useDataStore, type Product, type ProductInput } from "@/lib/data-store";
 import { formatRupiah } from "@/lib/formatters";
+import FormattedMarkdown from "@/components/FormattedMarkdown";
 import type {
   ApiResponse,
   InventoryForecastData,
@@ -34,6 +34,7 @@ interface ProductForm {
   name: string;
   category: string;
   price: string;
+  stock: string;
   image: string;
   specs: string;
   description: string;
@@ -44,6 +45,7 @@ const EMPTY_FORM: ProductForm = {
   name: "",
   category: "",
   price: "",
+  stock: "50",
   image: "",
   specs: "",
   description: "",
@@ -68,6 +70,7 @@ export default function AdminProdukPage() {
   const {
     data: inventoryResponse,
     isLoading: inventoryLoading,
+    mutate: mutateInventory,
   } = useSWR<ApiResponse<InventoryForecastData>>(
     "/api/ai/inventory/forecast",
     apiFetcher,
@@ -89,19 +92,35 @@ export default function AdminProdukPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, stock: "50" });
     setActionError(null);
     setShowForm(true);
   };
 
   const openEdit = (product: Product) => {
     setEditingId(product.id);
+    let stockVal = "50";
+    let pureSpecs = product.specs ?? "";
+
+    if (product.specs) {
+      const match = product.specs.match(/(?:stok|stock|qty|jumlah)\s*[:=]\s*(\d+)/i);
+      if (match && match[1]) {
+        stockVal = match[1];
+        // Clean out stock prefix from specs field for friendly editing
+        pureSpecs = product.specs
+          .replace(/(?:stok|stock|qty|jumlah)\s*[:=]\s*\d+\s*(?:unit|pcs|kotak|strip|botol)?\s*\|\s*/i, "")
+          .replace(/\|\s*(?:stok|stock|qty|jumlah)\s*[:=]\s*\d+\s*(?:unit|pcs|kotak|strip|botol)?/i, "")
+          .trim();
+      }
+    }
+
     setForm({
       name: product.name,
       category: product.category,
       price: String(product.price),
+      stock: stockVal,
       image: product.image ?? "",
-      specs: product.specs ?? "",
+      specs: pureSpecs,
       description: product.description ?? "",
       isActive: product.isActive,
     });
@@ -114,12 +133,20 @@ export default function AdminProdukPage() {
     setActionError(null);
     setIsSaving(true);
 
+    const cleanSpecsText = form.specs.trim();
+    const stockNumber = parseInt(form.stock, 10);
+    const formattedSpecs = !isNaN(stockNumber)
+      ? cleanSpecsText
+        ? `Stok: ${stockNumber} unit | ${cleanSpecsText}`
+        : `Stok: ${stockNumber} unit`
+      : cleanSpecsText || null;
+
     const input: ProductInput = {
       name: form.name.trim(),
       category: form.category.trim(),
       price: Number(form.price),
       image: form.image.trim() || null,
-      specs: form.specs.trim() || null,
+      specs: formattedSpecs,
       description: form.description.trim() || null,
       isActive: form.isActive,
     };
@@ -130,6 +157,7 @@ export default function AdminProdukPage() {
       } else {
         await addProduct(input);
       }
+      mutateInventory();
       closeForm();
     } catch (submitError) {
       setActionError(errorMessage(submitError));
@@ -143,6 +171,7 @@ export default function AdminProdukPage() {
     setIsSaving(true);
     try {
       await deleteProduct(id);
+      mutateInventory();
       setDeleteConfirm(null);
     } catch (deleteError) {
       setActionError(errorMessage(deleteError));
@@ -213,7 +242,7 @@ export default function AdminProdukPage() {
             Produk & Gudang Farmasi
           </h1>
           <p className="mt-1 text-sm text-[#6B7C72]">
-            Kelola katalog obat/alat dan peramalan kebutuhan stok otomatis berbasis AI.
+            Kelola stok obat/alat dan peramalan kebutuhan restock otomatis berbasis AI.
           </p>
         </div>
         <button
@@ -248,7 +277,7 @@ export default function AdminProdukPage() {
                 </span>
               </div>
               <p className="text-xs text-[#6B7C72]">
-                Menganalisis sinyal keluhan pasien di konsultasi untuk memproyeksikan sisa hari stok & rekomendasi restock (EOQ).
+                Menganalisis stok riil gudang terhadap laju keluhan pasien untuk menghitung sisa hari & jumlah pemesanan optimal (EOQ).
               </p>
             </div>
           </div>
@@ -431,7 +460,8 @@ export default function AdminProdukPage() {
                   "Nama Produk & Sinyal AI",
                   "Kategori",
                   "Harga",
-                  "Proyeksi Stok AI",
+                  "Stok Fisik",
+                  "Proyeksi Sisa (AI)",
                   "Saran PO (EOQ)",
                   "Status",
                   "Aksi",
@@ -470,6 +500,16 @@ export default function AdminProdukPage() {
                     <td className="px-5 py-4 text-xs font-medium text-[#4A5D53]">{product.category}</td>
                     <td className="px-5 py-4 text-sm font-bold text-[#0D5C46]">
                       {formatRupiah(product.price)}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="text-xs font-bold text-[#1A2421]">
+                        {invItem ? `${invItem.estimatedCurrentStock} unit` : "-"}
+                      </div>
+                      {invItem && (
+                        <span className="block text-[10px] text-gray-400 font-medium">
+                          ±{invItem.dailyDemandRate} unit/hari
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       {invItem ? (
@@ -546,8 +586,11 @@ export default function AdminProdukPage() {
                 </div>
                 {invItem && (
                   <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-xs">
-                    <div>{getStatusBadge(invItem.stockStatus, invItem.runoutDays)}</div>
-                    <div className="text-[11px] text-gray-500 font-medium">
+                    <div>
+                      <span className="font-bold text-gray-700">Stok: {invItem.estimatedCurrentStock} unit</span>
+                      <div className="mt-0.5">{getStatusBadge(invItem.stockStatus, invItem.runoutDays)}</div>
+                    </div>
+                    <div className="text-[11px] text-gray-500 font-medium text-right">
                       Saran PO: <strong className="text-[#0D5C46]">{invItem.recommendedReorderQty} unit</strong>
                     </div>
                   </div>
@@ -615,7 +658,7 @@ export default function AdminProdukPage() {
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-[#EAE4DC] px-6 py-4">
               <h2 className="text-lg font-bold text-[#0D5C46]">
-                {editingId ? "Edit Produk" : "Tambah Produk Baru"}
+                {editingId ? "Edit Produk & Stok" : "Tambah Produk Baru"}
               </h2>
               <button
                 aria-label="Tutup formulir"
@@ -642,7 +685,7 @@ export default function AdminProdukPage() {
                   className="form-input"
                 />
               </FormField>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <FormField label="Kategori">
                   <input
                     required
@@ -666,6 +709,19 @@ export default function AdminProdukPage() {
                     className="form-input"
                   />
                 </FormField>
+                <FormField label="Stok Fisik (Unit)">
+                  <input
+                    required
+                    type="number"
+                    min={0}
+                    max={100000}
+                    step={1}
+                    value={form.stock}
+                    onChange={(event) => updateField("stock", event.target.value)}
+                    placeholder="50"
+                    className="form-input"
+                  />
+                </FormField>
               </div>
               <FormField label="URL Gambar">
                 <input
@@ -681,6 +737,7 @@ export default function AdminProdukPage() {
                   maxLength={2000}
                   value={form.specs}
                   onChange={(event) => updateField("specs", event.target.value)}
+                  placeholder="Contoh: Digital 5 detik, 50 strip"
                   className="form-input"
                 />
               </FormField>
