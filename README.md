@@ -4,11 +4,43 @@ Backend API untuk aplikasi telehealth menggunakan Express.js, Bun, PostgreSQL, d
 
 ## Teknologi
 
-- Bun `1.3.12`
+- Bun `1.3.14`
 - Express.js `5`
 - TypeScript
 - PostgreSQL `17` melalui Docker
 - Prisma ORM `7`
+- Groq AI SDK (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `llama-3.2-11b-vision-preview`)
+- Google Gemini Embedding (`gemini-embedding-001`)
+
+## Ekosistem AI Agents & Clinical Intelligence Engine
+
+Sistem backend ini dilengkapi dengan arsitektur Multi-Agent AI terdistribusi yang terbagi menjadi dua ranah utama: **Fitur AI untuk Pengguna/Pasien (Public User)** dan **Fitur AI untuk Admin & Manajemen Telehealth (Admin Portal)**.
+
+### 1. Fitur AI untuk Pasien & Pengguna Publik
+
+| Status | AI Agent / Modul | Deskripsi & Kemampuan Utama | Integrasi / Endpoint |
+| :---: | :--- | :--- | :--- |
+| ✅ | **Master Router & Intent Dispatcher** | Mengklasifikasikan intensi pengguna secara real-time dan mengarahkan pesan ke agent spesifik (`EDUCATION`, `TRIAGE`, atau `VISION`). | Internal Multi-Agent Router (`router.agent.ts`) |
+| ✅ | **AI Diabetes Education & RAG Assistant** | Edukasi diabetes berbasis RAG (*Retrieval-Augmented Generation*), skrining bertahap natural, rekomendasi produk, dan rujukan dokter spesialis. | `POST /api/chat`<br>`POST /api/chat/stream` |
+| ✅ | **AI Clinical Triage & SBAR Generator** | Evaluasi tingkat keparahan keluhan medis (*Emergency, Urgent, Non-Urgent*) dan penyusunan ringkasan medis terstruktur format SBAR (*Situation, Background, Assessment, Recommendation*). | `POST /api/chat` (Triage Mode) |
+| ✅ | **AI Food Vision & Nutrition Comparison** | Analisis visual foto makanan (estimasi karbohidrat, protein, kalori, dampak glikemik) dan komparasi 2 foto menu makanan untuk diabetes. | `POST /api/chat` (Vision Mode) |
+| ✅ | **AI Glucose Trends & HbA1c Estimator** | Menganalisis log glukosa harian, mendeteksi episode hipoglikemia, spike gula darah, dan menghitung estimasi HbA1c secara klinis. | `POST /api/ai/glucose/trends` |
+| ✅ | **FINDRISC Diabetes Risk Calculator** | Kalkulator risiko diabetes tipe 2 standar internasional (skor 0–26) dengan estimasi probabilitas 10 tahun dan rencana pencegahan. | `POST /api/ai/risk/findrisc` |
+| ✅ | **Drug Interaction Checker** | Memeriksa potensi interaksi berbahaya antara obat diabetes, obat komorbiditas (NSAID, antihipertensi), dan alkohol. | `POST /api/ai/medications/interactions` |
+| ✅ | **Contraindication Checker** | Mendeteksi kontraindikasi obat terhadap kondisi khusus pasien (gangguan ginjal berat eGFR, kehamilan, peringatan lansia). | `POST /api/ai/medications/contraindications` |
+| ✅ | **Medical Safety Guardrails** | Proteksi keamanan berlapis: deteksi kegawatdaruratan (119/IGD), proteksi *self-harm*, blokir *prompt injection/jailbreak*, dan penyaringan klaim medis palsu. | `guardrails.service.ts` |
+
+---
+
+### 2. Fitur AI untuk Admin & Manajemen Telehealth
+
+| Status | AI Agent / Modul | Deskripsi & Kemampuan Utama | Integrasi / Endpoint |
+| :---: | :--- | :--- | :--- |
+| ✅ | **AI Finance & Revenue Intelligence** | Menghitung total valuasi katalog produk, menganalisis potensi omset *Sales Pipeline* berbasis pasien aktif, menyajikan ringkasan eksekutif, dan penasihat finansial bisnis interaktif. | `GET /api/ai/finance/insights`<br>`POST /api/ai/finance/query` |
+| ✅ | **AI Lead Scoring CRM & WhatsApp Outreach** | Mengevaluasi prospek pasien dengan skor 0–100 (4 pilar), klasifikasi tier (`HOT 🔥`, `WARM ⚡`, `COLD ❄️`), dan pembuatan draf pesan WhatsApp personalisasi 1-klik. | `GET /api/ai/leads/batch-scores` |
+| ✅ | **AI Pharmacy Inventory & Restock Forecasting** | Membaca stok fisik riil di gudang, menganalisis laju permintaan pasien (*Demand Velocity*), memproyeksikan sisa hari ketersediaan (*Runout Days*), menghitung kuantitas pemesanan optimal (*EOQ Buffer 30 Hari*), dan asisten tanya-jawab pengadaan barang. | `GET /api/ai/inventory/forecast`<br>`POST /api/ai/inventory/query` |
+
+---
 
 ## Prasyarat
 
@@ -229,6 +261,20 @@ Endpoint admin yang membutuhkan session:
 | `PATCH`  | `/api/doctors/:id`    | Memperbarui dokter                      |
 | `DELETE` | `/api/doctors/:id`    | Menghapus dokter                        |
 
+Endpoint AI Clinical Tools & Admin Intelligence:
+
+| Method | Endpoint                              | Keterangan                                              |
+| ------ | ------------------------------------- | ------------------------------------------------------- |
+| `POST` | `/api/ai/glucose/trends`              | Analisis tren gula darah, spike, dan estimasi HbA1c     |
+| `POST` | `/api/ai/risk/findrisc`               | Kalkulasi skor risiko diabetes FINDRISC                 |
+| `POST` | `/api/ai/medications/interactions`    | Cek interaksi obat diabetes & komorbiditas             |
+| `POST` | `/api/ai/medications/contraindications` | Cek kontraindikasi klinis (ginjal, lansia, kehamilan)   |
+| `GET`  | `/api/ai/finance/insights`            | Ringkasan metrik finansial & valuasi pipeline admin     |
+| `POST` | `/api/ai/finance/query`               | Tanya jawab interaktif dengan AI Finance Advisor        |
+| `GET`  | `/api/ai/leads/batch-scores`          | Batch Lead Scoring (HOT/WARM/COLD) & draf WhatsApp CRM  |
+| `GET`  | `/api/ai/inventory/forecast`          | Peramalan stok obat/alat, runout days, dan saran EOQ    |
+| `POST` | `/api/ai/inventory/query`             | Tanya jawab interaktif dengan AI Procurement Advisor    |
+
 Endpoint daftar mendukung `page`, `limit`, dan `search`. Produk mendukung filter `category`, sedangkan dokter mendukung `categoryId`. Endpoint admin juga mendukung `active=true` atau `active=false`.
 
 ## Pengujian
@@ -244,7 +290,6 @@ Integration test memeriksa health check, data publik, proteksi route admin, logi
 
 ## Perintah yang Tersedia
 
-vcc
 | Perintah | Keterangan |
 | --- | --- |
 | `bun install` | Menginstal dependency dan generate Prisma Client |
