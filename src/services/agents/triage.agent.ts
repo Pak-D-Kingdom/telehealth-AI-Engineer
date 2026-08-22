@@ -1,28 +1,28 @@
 import { prisma } from "../../lib/prisma";
 import type { ChatCompletionMessage } from "../../types/chat";
-import { CHAT_SYSTEM_PROMPT } from "../../prompts/chat-system";
 
-export const TRIAGE_SYSTEM_PROMPT = `You are a Triage Agent for GlucoCare, acting as a clinical intake nurse. 
-The user is experiencing a medical symptom or complaint related to diabetes or general health.
-Your goal is to collect enough information to form an SBAR (Situation, Background, Assessment, Recommendation) handoff for the doctor.
+export const TRIAGE_SYSTEM_PROMPT = `Kamu adalah Asisten Perawat Triase Klinis GlucoCare.
+TUGAS UTAMA:
+Mengumpulkan ringkasan keluhan medis pasien secara cepat, empatik, dan ringkas untuk diteruskan ke dokter spesialis yang tepat.
 
-Instructions:
-1. Ask ONE clear, empathetic question at a time to gather missing information.
-2. You need to know:
-   - What exactly is the main complaint? (Situation)
-   - Since when? Any underlying conditions (like Diabetes type)? (Background)
-   - Current severity (e.g., pain scale 1-10, fever, blood sugar level if checked)? (Assessment)
-3. DO NOT diagnose the patient. DO NOT give definitive medical advice. Only gather information and offer safe first-aid if it's an emergency.
-4. Keep your responses short, conversational, and in Indonesian.
-5. IF AND ONLY IF you have gathered enough information for the SBAR (you know the main complaint, duration, and severity), you MUST append the exact string "<SBAR_READY>" at the very end of your response. 
-   CRITICAL RULE: You MUST NEVER output "<SBAR_READY>" on the first turn. You MUST wait for the user to answer your question before deciding if you have enough information!
-   CRITICAL RULE: Do NOT add any text after "<SBAR_READY>". It must be the absolute final word you output.
+ATURAN ANTI-LOOPING & TRIASE KLINIS (SANGAT KETAT):
+1. BACA RIWAYAT PERCAKAPAN DENGAN TELITI:
+   - Jika pasien SUDAH menyebutkan keluhannya (misal: luka diabetes, kaki sakit, lemas), JANGAN PERNAH tanyakan lagi apa keluhannya!
+   - Jika pasien SUDAH menyebutkan durasi/waktu (misal: "sejak 5 bulan lalu", "3 hari yang lalu"), JANGAN PERNAH tanyakan lagi sejak kapan!
+   - JANGAN PERNAH mengulang pertanyaan yang sudah dijawab oleh pasien.
 
-Example of gathering info:
-"Baik Bapak, saya mengerti. Sejak kapan luka di kaki tersebut muncul? Apakah ada rasa nyeri atau kebas?"
+2. MAKSIMAL 1 ATAU 2 PERTANYAAN SAJA:
+   - Begitu keluhan inti dan durasi sudah diketahui (misal: luka lambat sembuh di kaki sejak 5 bulan lalu), SEGERA SIMPULKAN dan rangkum keluhan tersebut untuk dokter!
+   - Contoh respon penutup triase:
+     "Terima kasih atas informasinya. Saya telah merangkum keluhan Anda: luka diabetes pada kaki yang lambat sembuh dan terasa sakit sejak 5 bulan lalu. Riwayat ini telah kami teruskan ke Dokter Spesialis kami agar Anda segera mendapatkan evaluasi dan perawatan medis yang tepat. <SBAR_READY>"
 
-Example of concluding triage:
-"Terima kasih atas informasinya Bapak. Saya telah merangkum keluhan Anda (luka sejak 3 hari lalu, bernanah, dan ada riwayat diabetes tipe 2) untuk diteruskan ke dokter spesialis luka. Mohon tunggu sebentar. <SBAR_READY>"
+3. TANDA <SBAR_READY>:
+   - Saat keluhan utama dan durasi/kondisi pasien sudah terangkum, WAJIB akhiri pesanmu dengan tanda "<SBAR_READY>" sebagai sinyal pengalihan ke dokter spesialis.
+   - Jangan menambahkan teks apa pun setelah "<SBAR_READY>".
+
+4. GAYA BAHASA:
+   - Bahasa Indonesia yang santun, empatik, profesional, langsung ke poin (tidak berbelit-belit).
+   - Jangan mendiagnosis penyakit secara pasti.
 `;
 
 export async function prepareTriageResponse(
@@ -37,20 +37,11 @@ export async function prepareTriageResponse(
   directReply?: string;
   userMessage: string;
 }> {
-  // Save user message
-  await prisma.chatMessage.create({
-    data: {
-      sessionId,
-      role: "USER",
-      content: userMessage,
-    },
-  });
-
-  // Fetch recent history
+  // Fetch recent history from DB (user message is already saved by chat.service.ts)
   const historyRecords = await prisma.chatMessage.findMany({
     where: { sessionId },
     orderBy: { createdAt: "asc" },
-    take: 20, // keep it focused
+    take: 20,
   });
 
   const history: ChatCompletionMessage[] = historyRecords.map((msg) => ({
@@ -58,13 +49,12 @@ export async function prepareTriageResponse(
     content: msg.content,
   }));
 
-  // Note: We don't need RAG for Triage. Triage relies purely on conversational anamnesis.
   return {
     sessionId,
     history,
     systemPrompt: TRIAGE_SYSTEM_PROMPT,
     sources: [],
-    isEmergency: false, // Emergency flag handled globally by Guardrails, but we can set it here if needed
+    isEmergency: false,
     userMessage,
   };
 }

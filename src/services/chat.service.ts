@@ -62,10 +62,17 @@ export async function processChatMessage(
   const prepared = await prepareChatMessage(resolved, message, image);
   if (prepared.directReply) return toDirectReply(prepared);
 
-  const reply = await sendChatCompletion(prepared.history, prepared.systemPrompt, {
-    isVision: prepared.isVision,
-  });
-  return finalizeChatResponse(prepared, reply);
+  try {
+    const reply = await sendChatCompletion(prepared.history, prepared.systemPrompt, {
+      isVision: prepared.isVision,
+    });
+    return finalizeChatResponse(prepared, reply);
+  } catch (error) {
+    console.warn("[Chat Service] AI completion failed, returning safe clinical fallback:", error);
+    const fallbackReply =
+      "Terima kasih atas informasi yang Anda berikan. Keluhan Anda telah kami catat dengan baik. Untuk memastikan kondisi gula darah dan penyembuhan Anda berjalan optimal, kami menyarankan konsultasi langsung bersama dokter spesialis kami.";
+    return finalizeChatResponse(prepared, fallbackReply);
+  }
 }
 
 export async function retryChatMessage(token: string | undefined) {
@@ -263,13 +270,16 @@ export async function finalizeChatResponse(
   // Intelligent Doctor referral checking
   let doctorReferral: DoctorRef | undefined = undefined;
   const needsDoctor =
+    sbarComplete ||
     lastMsgLower.includes("dokter") ||
     lastMsgLower.includes("spesialis") ||
     lastMsgLower.includes("luka") ||
     lastMsgLower.includes("kebas") ||
     lastMsgLower.includes("kesemutan parah") ||
     replyLower.includes("konsultasi dengan dokter") ||
-    replyLower.includes("perlu evaluasi dokter");
+    replyLower.includes("perlu evaluasi dokter") ||
+    replyLower.includes("diteruskan ke dokter") ||
+    replyLower.includes("dokter spesialis");
 
   if (needsDoctor) {
     const dbDoctors = await listDoctors({ page: 1, limit: 5 }, true);
@@ -494,6 +504,19 @@ function buildDynamicSuggestions(
   const suggestions: string[] = [];
   const textLower = replyText.toLowerCase();
   const queryLower = userQuery.toLowerCase();
+
+  // 0. Contextual Triage Handoff Quick Suggestions
+  if (
+    replyText.includes("<SBAR_READY>") ||
+    textLower.includes("diteruskan ke dokter") ||
+    textLower.includes("merangkum keluhan")
+  ) {
+    return [
+      "Hubungkan saya dengan Dokter Spesialis sekarang",
+      "Apa saja dokumen/riwayat yang perlu saya siapkan?",
+      "Bagaimana pertolongan pertama di rumah sambil menunggu dokter?",
+    ];
+  }
 
   // 0. Contextual Lead Screening Quick Answers (1-tap response chips)
   if (textLower.includes("tipe diabetes") || textLower.includes("terdiagnosis")) {

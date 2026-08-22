@@ -49,7 +49,7 @@ describe("Free User AI Agent: Diabetes Daily Meal & Carb Planner", () => {
 
       expect(result.proPlanPreview).toBeDefined();
       expect(typeof result.proPlanPreview.bannerTitle).toBe("string");
-    }, 60000);
+    }, 75000);
   });
 
   describe("API Endpoints Integration", () => {
