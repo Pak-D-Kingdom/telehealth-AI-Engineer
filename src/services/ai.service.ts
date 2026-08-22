@@ -129,9 +129,8 @@ async function callLLMWithRotation(
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Key Rotation] Groq key index ${keyIndex} failed (${response.status}):`, errorText);
-        if (response.status >= 500) continue;
-        throw new Error(`Groq API error: ${response.status} ${errorText}`);
+        console.warn(`[Key Rotation] Groq key index ${keyIndex} failed (${response.status}):`, errorText);
+        continue;
       }
 
       // Success - update active key index

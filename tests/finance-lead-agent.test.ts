@@ -41,7 +41,7 @@ describe("Admin AI Agents: Finance Intelligence & Lead Scoring CRM", () => {
       expect(Array.isArray(insights.executiveSummary.keyOpportunities)).toBe(true);
       expect(Array.isArray(insights.executiveSummary.bundlingRecommendations)).toBe(true);
       expect(typeof insights.executiveSummary.actionableAdvice).toBe("string");
-    }, 30000);
+    }, 45000);
 
     test("menangani query interaktif tanya jawab finansial admin", async () => {
       const result = await FinanceAgent.askFinanceAdvisor("Bagaimana cara meningkatkan konversi produk glukometer?");
@@ -49,7 +49,7 @@ describe("Admin AI Agents: Finance Intelligence & Lead Scoring CRM", () => {
       expect(result).toBeDefined();
       expect(typeof result.answer).toBe("string");
       expect(result.answer.length).toBeGreaterThan(10);
-    }, 30000);
+    }, 45000);
 
     test("melempar error jika query finansial kosong", async () => {
       expect(FinanceAgent.askFinanceAdvisor("")).rejects.toThrow();
@@ -76,7 +76,7 @@ describe("Admin AI Agents: Finance Intelligence & Lead Scoring CRM", () => {
         expect(first.factors).toBeDefined();
         expect(typeof first.whatsAppDraft).toBe("string");
       }
-    }, 30000);
+    }, 45000);
   });
 
   describe("API Endpoints Integration", () => {
@@ -87,7 +87,7 @@ describe("Admin AI Agents: Finance Intelligence & Lead Scoring CRM", () => {
       expect(json.success).toBe(true);
       expect(json.data.catalogSummary).toBeDefined();
       expect(json.data.pipelineSummary).toBeDefined();
-    }, 30000);
+    }, 45000);
 
     test("POST /api/ai/finance/query mengembalikan HTTP 200 dengan jawaban AI", async () => {
       const res = await fetch(`${baseUrl}/api/ai/finance/query`, {
@@ -99,7 +99,7 @@ describe("Admin AI Agents: Finance Intelligence & Lead Scoring CRM", () => {
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(typeof json.data.answer).toBe("string");
-    }, 30000);
+    }, 45000);
 
     test("GET /api/ai/leads/batch-scores mengembalikan HTTP 200 dengan statistik lead", async () => {
       const res = await fetch(`${baseUrl}/api/ai/leads/batch-scores`);

@@ -495,6 +495,42 @@ function buildDynamicSuggestions(
   const textLower = replyText.toLowerCase();
   const queryLower = userQuery.toLowerCase();
 
+  // 0. Contextual Lead Screening Quick Answers (1-tap response chips)
+  if (textLower.includes("tipe diabetes") || textLower.includes("terdiagnosis")) {
+    return [
+      "Diabetes Tipe 2",
+      "Pra-Diabetes",
+      "Diabetes Tipe 1",
+      "Belum Pernah Terdiagnosis / Baru Skrining",
+    ];
+  }
+
+  if (
+    textLower.includes("obat yang sedang dikonsumsi") ||
+    textLower.includes("obat apa") ||
+    textLower.includes("pengobatan") ||
+    textLower.includes("sedang mengonsumsi obat")
+  ) {
+    return [
+      "Metformin 500mg",
+      "Glibenklamid / Glimepiride",
+      "Suntik Insulin",
+      "Belum Pernah Minum Obat Diabetes",
+    ];
+  }
+
+  if (
+    textLower.includes("keluhan utama") ||
+    textLower.includes("yang sedang dirasakan") ||
+    textLower.includes("gejala utama")
+  ) {
+    return [
+      "Gula darah sering tinggi dan tidak stabil",
+      "Kaki sering kesemutan atau ada luka",
+      "Ingin konsultasi diet makanan & pencegahan",
+    ];
+  }
+
   // 1. Hipoglikemia / Gula Darah Rendah
   if (
     queryLower.includes("rendah") ||
