@@ -129,7 +129,8 @@ export default function Dermatologists({ onOpenChat }: DermatologistsProps) {
             {filteredDoctors.map((doctor) => (
               <div
                 key={doctor.id}
-                className="group flex flex-col justify-between space-y-6 bg-white p-5 rounded-3xl border border-[#E8E4DE] shadow-2xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                id={`doctor-${doctor.slug}`}
+                className="group flex scroll-mt-24 flex-col justify-between space-y-6 bg-white p-5 rounded-3xl border border-[#E8E4DE] shadow-2xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
                 <div className="space-y-4">
                   <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden bg-[#F3ECE5]">

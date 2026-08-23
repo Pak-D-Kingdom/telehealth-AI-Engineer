@@ -54,11 +54,18 @@ export interface RelatedCareDoctor {
   image: string | null;
 }
 
+export interface SuggestedReply {
+  id: string;
+  label: string;
+  message: string;
+}
+
 export interface RelatedCareOptions {
   reason: string;
   disclaimer: string;
   products: RelatedCareProduct[];
   doctors: RelatedCareDoctor[];
+  suggestedReplies?: SuggestedReply[];
 }
 
 export interface AdminChatLead {

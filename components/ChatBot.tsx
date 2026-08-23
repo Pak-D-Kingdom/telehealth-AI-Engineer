@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   BookOpen,
@@ -19,8 +20,11 @@ import type {
   ChatFeedback,
   ChatFeedbackRating,
   ChatFeedbackReason,
+  RelatedCareDoctor,
   RelatedCareOptions,
+  RelatedCareProduct,
 } from "@/lib/api-types";
+import { addProductToCart } from "@/lib/cart";
 import ChatFeedbackControls from "@/components/ChatFeedbackControls";
 import ChatPanelSizeToggle from "@/components/ChatPanelSizeToggle";
 import MarkdownMessage from "@/components/MarkdownMessage";
@@ -98,6 +102,7 @@ interface ChatBotProps {
 }
 
 export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatBotProps) {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -330,6 +335,10 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     () => messages.findLast((message) => message.sender === "user" && message.failed),
     [messages],
   );
+  const latestAssistantMessageId = useMemo(
+    () => messages.findLast((message) => message.sender === "ai" && !message.isStreaming)?.id,
+    [messages],
+  );
   const providerBlocked = isProviderBlocked(providerStatus, now);
 
   const handleSendMessage = (query = input) => {
@@ -377,6 +386,22 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     } finally {
       setIsResetting(false);
     }
+  };
+
+  const handleViewCatalogItem = (kind: "product" | "doctor", slug: string) => {
+    onClose();
+    router.push(`/#${kind}-${slug}`);
+  };
+
+  const handleBuyProduct = (product: RelatedCareProduct) => {
+    const added = addProductToCart(product);
+    if (!added) {
+      setChatError("Produk belum dapat ditambahkan. Silakan coba lagi.");
+      return;
+    }
+
+    onClose();
+    router.push("/checkout");
   };
 
   return (
@@ -521,7 +546,17 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                       <SourceList sources={message.sources} />
                     )}
                     {!message.isStreaming && message.relatedCare && (
-                      <RelatedCareCards options={message.relatedCare} onSelect={handleSendMessage} />
+                      <RelatedCareCards
+                        options={message.relatedCare}
+                        onSelect={handleSendMessage}
+                        onViewProduct={(product: RelatedCareProduct) =>
+                          handleViewCatalogItem("product", product.slug)}
+                        onBuyProduct={handleBuyProduct}
+                        onViewDoctor={(doctor: RelatedCareDoctor) =>
+                          handleViewCatalogItem("doctor", doctor.slug)}
+                        disabled={isSending || providerBlocked || !consentGranted}
+                        showSuggestions={message.id === latestAssistantMessageId}
+                      />
                     )}
                   </div>
                   {message.sender === "ai" && !message.isStreaming && message.persistedId && (

@@ -12,69 +12,15 @@ import {
   ChevronRight,
   RefreshCw
 } from "lucide-react";
-
-interface CartItem {
-  id: string;
-  name: string;
-  unit: string;
-  price: number;
-  image: string;
-  qty: number;
-}
-
-const CART_KEY = "glucocare_cart";
-const CART_CHANGE_EVENT = "telehealth-cart-change";
-const DEFAULT_ITEMS: CartItem[] = [
-  {
-    id: "p1",
-    name: "GlucoMeter Pro Digital Kit",
-    unit: "Digital Kit + 50 Strip",
-    price: 189000,
-    image: "/images/glucometer.png",
-    qty: 1,
-  },
-  {
-    id: "p2",
-    name: "Strip Tes Gula Darah",
-    unit: "Isi 50 Strip",
-    price: 45000,
-    image: "/images/glucometer.png",
-    qty: 2,
-  },
-];
-
-function subscribeToCart(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener(CART_CHANGE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(CART_CHANGE_EVENT, callback);
-  };
-}
-
-function getCartSnapshot() {
-  return localStorage.getItem(CART_KEY);
-}
-
-function getServerCartSnapshot() {
-  return null;
-}
-
-function parseCart(value: string | null): CartItem[] {
-  if (!value) return DEFAULT_ITEMS;
-
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? (parsed as CartItem[]) : DEFAULT_ITEMS;
-  } catch {
-    return DEFAULT_ITEMS;
-  }
-}
-
-function saveCart(items: CartItem[]) {
-  localStorage.setItem(CART_KEY, JSON.stringify(items));
-  window.dispatchEvent(new Event(CART_CHANGE_EVENT));
-}
+import {
+  CART_CHANGE_EVENT,
+  CART_KEY,
+  getCartSnapshot,
+  getServerCartSnapshot,
+  parseCart,
+  saveCart,
+  subscribeToCart,
+} from "@/lib/cart";
 
 export default function CheckoutPage() {
   const cartSnapshot = useSyncExternalStore(

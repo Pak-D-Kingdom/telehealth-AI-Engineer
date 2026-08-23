@@ -27,12 +27,52 @@ describe("RelatedCareCards", () => {
           experience: "10 Tahun",
           image: null,
         }],
+        suggestedReplies: [{
+          id: "type-2",
+          label: "Diabetes tipe 2",
+          message: "Saya memiliki diabetes tipe 2.",
+        }],
       },
+      onSelect: () => undefined,
+      onViewProduct: () => undefined,
+      onBuyProduct: () => undefined,
+      onViewDoctor: () => undefined,
+      showSuggestions: true,
     }));
 
     expect(html).toContain("Bukan rekomendasi obat personal");
     expect(html).toContain("Metformin Demo");
     expect(html).toContain("Hanya dengan resep");
     expect(html).toContain("dr. Dokter Demo");
+    expect(html).toContain("Lihat produk");
+    expect(html).toContain("Konsultasi resep");
+    expect(html).not.toContain("Beli produk");
+    expect(html).toContain("Lihat profil");
+    expect(html).toContain("Mulai konsultasi");
+    expect(html).toContain("Diabetes tipe 2");
+  });
+
+  test("menawarkan pembelian hanya untuk produk tanpa resep", () => {
+    const html = renderToStaticMarkup(createElement(RelatedCareCards, {
+      options: {
+        reason: "Produk terkait pemantauan gula darah",
+        disclaimer: "Pastikan produk sesuai dengan alat yang digunakan.",
+        products: [{
+          id: "00000000-0000-4000-8000-000000000003",
+          slug: "strip-demo",
+          name: "Strip Tes Demo",
+          category: "Alat kesehatan",
+          price: 50_000,
+          image: null,
+          guidance: "Periksa kompatibilitas produk.",
+          requiresPrescription: false,
+        }],
+        doctors: [],
+        suggestedReplies: [],
+      },
+      onBuyProduct: () => undefined,
+    }));
+
+    expect(html).toContain("Beli produk");
   });
 });
