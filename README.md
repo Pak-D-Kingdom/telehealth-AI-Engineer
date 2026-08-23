@@ -51,7 +51,8 @@ docker compose version
    bun run dev
    ```
 
-   Chatbot membutuhkan `GROQ_API_KEY` dan `GEMINI_API_KEY` baru pada `.env` backend. Setelah keduanya diisi, jalankan `bun run db:seed:knowledge` sebelum memakai fitur RAG.
+   Chatbot membutuhkan endpoint, API key, serta model chat/embedding 9Router pada `.env`
+   backend. Setelah dikonfigurasi, jalankan `bun run db:seed:knowledge` sebelum memakai fitur RAG.
 
 5. Kembali ke frontend dan jalankan development server:
 
@@ -74,9 +75,14 @@ Frontend menggunakan API berikut:
 
 Request autentikasi admin dan chatbot memakai cookie HTTP-only serta `credentials: "include"`. Karena itu, nilai `FRONTEND_URL` pada backend harus sama dengan origin frontend, secara default `http://localhost:3000`.
 
-Widget chat memulihkan histori dari backend ketika dibuka, mengirim pesan langsung ke API, dan menampilkan respons darurat yang ditandai backend. Tidak ada lagi respons medis berbasis kata kunci atau data percakapan palsu di frontend.
+Widget chat memulihkan histori dari backend ketika dibuka, mengirim pesan langsung ke API,
+menampilkan respons darurat yang ditandai backend, serta menyediakan feedback membantu/tidak
+membantu untuk setiap jawaban yang sudah tersimpan. Tidak ada respons medis berbasis kata
+kunci atau data percakapan palsu di frontend.
 
-Admin dapat membuka `/admin/chat` untuk mencari session, memfilter emergency/lead/status, membaca histori, menyelesaikan session, dan memberikan status kualifikasi lead.
+Admin dapat membuka `/admin/chat` untuk mencari session, memfilter emergency/lead/status,
+membaca histori, menyelesaikan session, memberikan status kualifikasi lead, serta meninjau
+model, latency, fallback, kualitas retrieval, intent, dan feedback setiap jawaban.
 
 ## Pemeriksaan Kode
 
