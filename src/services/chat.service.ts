@@ -405,7 +405,8 @@ async function prepareNormalResponse(
     : "";
   const relatedCareContext = relatedCare
     ? `\n\nKATALOG TERKAIT YANG AKAN DITAMPILKAN UI:
-- Produk: ${relatedCare.products.map((product) => product.name).join(", ") || "tidak ada"}
+- Produk: ${relatedCare.products.map((product) =>
+        `${product.name} (${product.category}; ${product.guidance})`).join(", ") || "tidak ada"}
 - Dokter: ${relatedCare.doctors.map((doctor) => `${doctor.name} (${doctor.specialty})`).join(", ") || "tidak ada"}
 
 Jelaskan singkat bahwa obat yang sesuai harus ditentukan dokter, lalu arahkan pengguna melihat pilihan produk GlucoCare dan dokter yang tampil di bawah jawaban. Jangan berhenti pada penolakan dan jangan menyebut pilihan produk ini sebagai resep untuk pengguna.`
@@ -551,6 +552,7 @@ function serializeRelatedCare(value: RelatedCareOptions | undefined) {
     disclaimer: value.disclaimer,
     products: value.products.map((product) => ({ ...product })),
     doctors: value.doctors.map((doctor) => ({ ...doctor })),
+    suggestedReplies: value.suggestedReplies.map((reply) => ({ ...reply })),
   } satisfies Prisma.InputJsonObject;
 }
 

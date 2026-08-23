@@ -133,6 +133,7 @@ describe("Telehealth API", () => {
       .toBe(true);
     expect(related?.doctors.length).toBeGreaterThan(0);
     expect(related?.disclaimer).toContain("bukan diagnosis");
+    expect(related?.suggestedReplies.length).toBeGreaterThan(0);
   });
 
   test("permintaan obat lanjutan menggunakan konteks diabetes dan menghasilkan katalog aktif", async () => {
@@ -144,6 +145,48 @@ describe("Telehealth API", () => {
     expect(related?.products.some((product) => /metformin/i.test(product.name))).toBe(true);
     expect(related?.products.some((product) => /\(Demo\)/i.test(product.name))).toBe(true);
     expect(related?.doctors.length).toBeGreaterThan(0);
+  });
+
+  test("katalog tipe 1 tidak mengarahkan pengguna ke obat diabetes tipe 2", async () => {
+    const related = await findRelatedCareOptions(
+      "Rekomendasikan produk atau obat untuk diabetes tipe 1.",
+    );
+
+    expect(related?.products.some((product) => /metformin|glimepiride|acarbose/i.test(product.name)))
+      .toBe(false);
+    expect(related?.doctors.length).toBeGreaterThan(0);
+  });
+
+  test("permintaan produk tanpa resep menyaring obat resep", async () => {
+    const related = await findRelatedCareOptions(
+      "Rekomendasikan produk pendukung tanpa resep untuk diabetes tipe 2.",
+    );
+
+    expect(related?.products.length).toBeGreaterThan(0);
+    expect(related?.products.every((product) => !product.requiresPrescription)).toBe(true);
+  });
+
+  test("pilihan produk dan dokter mempertahankan item yang disebut pengguna", async () => {
+    const initial = await findRelatedCareOptions(
+      "Rekomendasikan produk dan dokter untuk diabetes tipe 2.",
+    );
+    const product = initial?.products[0];
+    const doctor = initial?.doctors[0];
+
+    expect(product).toBeDefined();
+    expect(doctor).toBeDefined();
+
+    const selectedProduct = await findRelatedCareOptions(
+      `Saya ingin rekomendasi informasi keamanan untuk produk ${product!.name}.`,
+      "Saya memiliki diabetes tipe 2.",
+    );
+    const selectedDoctor = await findRelatedCareOptions(
+      `Saya ingin konsultasi dengan ${doctor!.name}.`,
+      "Saya memiliki diabetes tipe 2.",
+    );
+
+    expect(selectedProduct?.products[0]?.id).toBe(product!.id);
+    expect(selectedDoctor?.doctors[0]?.id).toBe(doctor!.id);
   });
 
   test("retry mencatat consent eksplisit pada session lama", async () => {

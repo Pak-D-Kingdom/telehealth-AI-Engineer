@@ -24,6 +24,7 @@ interface ChatReply {
     disclaimer: string;
     products: Array<{ name: string; requiresPrescription: boolean }>;
     doctors: Array<{ name: string }>;
+    suggestedReplies: Array<{ id: string; label: string; message: string }>;
   };
 }
 
@@ -101,6 +102,7 @@ async function main() {
     "Katalog harus memuat produk pemantauan yang cocok dengan konteks HbA1c.",
   );
   assert.ok(doseResult.body.data.relatedCare.doctors.length > 0);
+  assert.ok(doseResult.body.data.relatedCare.suggestedReplies.length > 0);
   assert.match(doseResult.body.data.relatedCare.disclaimer, /bukan diagnosis|bukan.*rekomendasi/i);
   const storedDoseReply = await prisma.chatMessage.findFirst({
     where: { sessionId: doseResult.body.data.sessionId, role: "ASSISTANT" },

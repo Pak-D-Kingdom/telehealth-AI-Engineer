@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { shouldShowRelatedCare } from "../src/services/care-catalog.service";
+import {
+  buildCareSuggestions,
+  shouldShowRelatedCare,
+} from "../src/services/care-catalog.service";
 
 describe("related care catalog intent", () => {
   test("mendeteksi permintaan produk atau dokter dalam domain diabetes", () => {
@@ -28,5 +31,27 @@ describe("related care catalog intent", () => {
     expect(shouldShowRelatedCare("Ada recommend obat ga ya?", context)).toBe(true);
     expect(shouldShowRelatedCare("Ada rekom obat ga ya?", context)).toBe(true);
     expect(shouldShowRelatedCare("Terima kasih.", `${context}\nRekomendasikan obat.`)).toBe(false);
+  });
+
+  test("memberikan pilihan klarifikasi tipe diabetes ketika konteks belum lengkap", () => {
+    const suggestions = buildCareSuggestions("Saya ingin rekomendasi obat diabetes.");
+
+    expect(suggestions.map((suggestion) => suggestion.label)).toEqual([
+      "Diabetes tipe 2",
+      "Diabetes tipe 1",
+      "Belum tahu tipenya",
+    ]);
+    expect(suggestions.every((suggestion) => /rekomendasi|konsultasi/i.test(suggestion.message)))
+      .toBe(true);
+  });
+
+  test("memberikan langkah produk dan dokter setelah tipe diabetes diketahui", () => {
+    const suggestions = buildCareSuggestions("Saya memiliki diabetes tipe 2.", "diabetes tipe 2");
+
+    expect(suggestions.map((suggestion) => suggestion.label)).toEqual([
+      "Produk tanpa resep",
+      "Konsultasi dokter",
+      "Bahas keamanan obat",
+    ]);
   });
 });

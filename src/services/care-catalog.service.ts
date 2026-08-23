@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import type { RelatedCareOptions } from "../types/chat";
+import type { RelatedCareOptions, SuggestedReply } from "../types/chat";
 
 interface CareProfile {
   label: string;
   doctorCategoryIds: string[];
   doctorTerms: string[];
   productTerms: string[];
+  medicationTerms: string[];
 }
 
 const DOMAIN_PATTERN = /\b(diabet(?:es)?|gula darah|glukosa|hba1c|insulin|metformin|hiperglikemia|hipoglikemia|ulkus|luka diabet|gestasional)\b/i;
@@ -18,8 +19,13 @@ const THERAPY_SUBJECT_PATTERN =
   /\b(obat|metformin|insulin|glp-?1|suplemen|resep|glucometer|strip|alat cek)\b/i;
 const MEDICATION_REQUEST_PATTERN =
   /\b(obat|metformin|glimepiride|acarbose|insulin|glp-?1|resep)\b/i;
-const MEDICATION_PRODUCT_PATTERN =
-  /\b(obat|obat keras|antidiabetes|metformin|glimepiride|acarbose|insulin|resep)\b/i;
+const DOCTOR_REQUEST_PATTERN = /\b(dokter|spesialis|konsultasi|rujuk|rujukan)\b/i;
+const PRODUCT_REQUEST_PATTERN =
+  /\b(obat|produk|metformin|glimepiride|acarbose|insulin|suplemen|glucometer|strip|alat cek|beli|resep)\b/i;
+const NON_PRESCRIPTION_PATTERN = /\b(tanpa resep|non[- ]?resep|obat bebas|produk pendukung)\b/i;
+const DIABETES_TYPE_PATTERN = /\b(tipe|type)\s*(1|2)\b|\b(gestasional|kehamilan)\b/i;
+const PRESCRIPTION_PRODUCT_PATTERN =
+  /\b(obat keras|obat resep|metformin|glimepiride|acarbose)\b/i;
 
 const PROFILES: Array<{ pattern: RegExp; profile: CareProfile }> = [
   {
@@ -29,6 +35,7 @@ const PROFILES: Array<{ pattern: RegExp; profile: CareProfile }> = [
       doctorCategoryIds: ["ulkus", "diabetes2"],
       doctorTerms: ["luka diabetes", "ulkus"],
       productTerms: ["ulkus", "luka", "glucoderm"],
+      medicationTerms: [],
     },
   },
   {
@@ -38,6 +45,27 @@ const PROFILES: Array<{ pattern: RegExp; profile: CareProfile }> = [
       doctorCategoryIds: ["gestational"],
       doctorTerms: ["gestasional", "hba1c"],
       productTerms: ["glucometer", "alat cek", "strip"],
+      medicationTerms: [],
+    },
+  },
+  {
+    pattern: /\b(?:diabetes\s*)?(?:tipe|type)\s*1\b/i,
+    profile: {
+      label: "diabetes tipe 1",
+      doctorCategoryIds: ["insulin"],
+      doctorTerms: ["insulin", "endokrinologi", "diabetes tipe 1"],
+      productTerms: ["insulin", "glucometer", "alat cek", "strip", "lancet", "keton"],
+      medicationTerms: [],
+    },
+  },
+  {
+    pattern: /\b(?:diabetes\s*)?(?:tipe|type)\s*2\b/i,
+    profile: {
+      label: "diabetes tipe 2",
+      doctorCategoryIds: ["diabetes2", "insulin"],
+      doctorTerms: ["diabetes tipe 2", "kontrol gula darah", "endokrinologi"],
+      productTerms: ["metformin", "glucometer", "alat cek"],
+      medicationTerms: ["metformin", "glimepiride", "acarbose"],
     },
   },
   {
@@ -47,6 +75,7 @@ const PROFILES: Array<{ pattern: RegExp; profile: CareProfile }> = [
       doctorCategoryIds: ["diabetes2", "insulin"],
       doctorTerms: ["kontrol gula darah", "hba1c", "endokrinologi"],
       productTerms: ["glucometer", "alat cek", "strip"],
+      medicationTerms: [],
     },
   },
   {
@@ -56,6 +85,7 @@ const PROFILES: Array<{ pattern: RegExp; profile: CareProfile }> = [
       doctorCategoryIds: ["insulin", "diabetes2"],
       doctorTerms: ["insulin", "endokrinologi", "kontrol gula darah"],
       productTerms: ["glucometer", "alat cek", "metformin"],
+      medicationTerms: ["metformin", "glimepiride", "acarbose"],
     },
   },
 ];
@@ -65,6 +95,7 @@ const DEFAULT_DIABETES_PROFILE: CareProfile = {
   doctorCategoryIds: ["diabetes2", "insulin"],
   doctorTerms: ["diabetes tipe 2", "kontrol gula darah", "endokrinologi"],
   productTerms: ["metformin", "glucometer", "alat cek"],
+  medicationTerms: ["metformin", "glimepiride", "acarbose"],
 };
 
 const relatedCareSchema = z.object({
@@ -88,6 +119,11 @@ const relatedCareSchema = z.object({
     experience: z.string(),
     image: z.string().nullable(),
   })),
+  suggestedReplies: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    message: z.string(),
+  })).max(4).default([]),
 });
 
 export function shouldShowRelatedCare(
@@ -107,9 +143,12 @@ export async function findRelatedCareOptions(
   if (!shouldShowRelatedCare(message, conversationContext)) return undefined;
 
   const profileContext = `${conversationContext}\n${message}`;
-  const profile = PROFILES.find((item) => item.pattern.test(profileContext))?.profile
+  const profile = PROFILES.find((item) => item.pattern.test(message))?.profile
+    ?? PROFILES.find((item) => item.pattern.test(conversationContext))?.profile
     ?? DEFAULT_DIABETES_PROFILE;
   const wantsMedication = MEDICATION_REQUEST_PATTERN.test(message);
+  const wantsDoctorOnly = DOCTOR_REQUEST_PATTERN.test(message) && !PRODUCT_REQUEST_PATTERN.test(message);
+  const wantsNonPrescription = NON_PRESCRIPTION_PATTERN.test(message);
   const [products, doctors] = await prisma.$transaction([
     prisma.product.findMany({
       where: { isActive: true },
@@ -147,20 +186,20 @@ export async function findRelatedCareOptions(
     .map((product) => {
       const searchableText =
         `${product.slug} ${product.name} ${product.category} ${product.specs ?? ""} ${product.description ?? ""}`;
+      const requiresPrescription = isPrescriptionProduct(searchableText);
       return {
         product,
-        score: scoreText(searchableText, profile.productTerms) +
-          (wantsMedication && MEDICATION_PRODUCT_PATTERN.test(searchableText) ? 3 : 0),
+        requiresPrescription,
+        score: (isCatalogItemMentioned(message, product.name) ? 10 : 0) +
+          scoreText(searchableText, profile.productTerms) +
+          (wantsMedication ? scoreText(searchableText, profile.medicationTerms) * 3 : 0),
       };
     })
-    .filter((item) => item.score > 0)
+    .filter((item) => !wantsDoctorOnly && item.score > 0)
+    .filter((item) => !wantsNonPrescription || !item.requiresPrescription)
     .sort((left, right) => right.score - left.score || left.product.name.localeCompare(right.product.name))
     .slice(0, 2)
-    .map(({ product }) => {
-      const requiresPrescription = /\b(obat|metformin|insulin|resep)\b/i.test(
-        `${product.name} ${product.category} ${product.specs ?? ""}`,
-      );
-      return {
+    .map(({ product, requiresPrescription }) => ({
         id: product.id,
         slug: product.slug,
         name: product.name,
@@ -171,15 +210,14 @@ export async function findRelatedCareOptions(
         guidance: requiresPrescription
           ? "Obat ini memerlukan resep dan pemeriksaan dokter."
           : "Tanyakan kepada tenaga medis apakah produk ini sesuai kebutuhan Anda.",
-      };
-    });
+      }));
 
   const rankedDoctors = doctors
     .map((doctor) => ({
       doctor,
       score: doctor.categories.reduce(
         (total, category) => total + (profile.doctorCategoryIds.includes(category.categoryId) ? 1 : 0),
-        0,
+        isCatalogItemMentioned(message, doctor.name) ? 10 : 0,
       ) + scoreText(`${doctor.name} ${doctor.specialty}`, profile.doctorTerms),
     }))
     .sort((left, right) => right.score - left.score || left.doctor.name.localeCompare(right.doctor.name))
@@ -201,7 +239,51 @@ export async function findRelatedCareOptions(
       "Pilihan ini mengikuti topik percakapan, bukan diagnosis atau resep untuk Anda. Dokter perlu memastikan obat yang sesuai, dosis, dan keamanannya.",
     products: rankedProducts,
     doctors: rankedDoctors,
+    suggestedReplies: buildCareSuggestions(profileContext, profile.label),
   };
+}
+
+export function buildCareSuggestions(
+  conversationContext: string,
+  profileLabel = DEFAULT_DIABETES_PROFILE.label,
+): SuggestedReply[] {
+  if (!DIABETES_TYPE_PATTERN.test(conversationContext)) {
+    return [
+      {
+        id: "diabetes-type-2",
+        label: "Diabetes tipe 2",
+        message: "Saya memiliki diabetes tipe 2 dan ingin melihat rekomendasi produk atau dokter terkait.",
+      },
+      {
+        id: "diabetes-type-1",
+        label: "Diabetes tipe 1",
+        message: "Saya memiliki diabetes tipe 1 dan ingin melihat rekomendasi produk atau dokter terkait.",
+      },
+      {
+        id: "diabetes-type-unknown",
+        label: "Belum tahu tipenya",
+        message: "Saya belum tahu tipe diabetes saya dan ingin konsultasi dokter serta melihat produk pemantauan yang terkait.",
+      },
+    ];
+  }
+
+  return [
+    {
+      id: "supporting-products",
+      label: "Produk tanpa resep",
+      message: `Saya ingin rekomendasi produk pendukung tanpa resep untuk ${profileLabel}.`,
+    },
+    {
+      id: "doctor-consultation",
+      label: "Konsultasi dokter",
+      message: `Saya ingin konsultasi dengan dokter terkait ${profileLabel}.`,
+    },
+    {
+      id: "medication-safety",
+      label: "Bahas keamanan obat",
+      message: `Saya ingin membahas keamanan obat yang sedang digunakan untuk ${profileLabel} dengan dokter.`,
+    },
+  ];
 }
 
 export function parseStoredRelatedCare(value: unknown) {
@@ -212,4 +294,12 @@ export function parseStoredRelatedCare(value: unknown) {
 function scoreText(value: string, terms: string[]) {
   const normalized = value.toLocaleLowerCase("id-ID");
   return terms.reduce((score, term) => score + (normalized.includes(term) ? 1 : 0), 0);
+}
+
+function isPrescriptionProduct(value: string) {
+  return PRESCRIPTION_PRODUCT_PATTERN.test(value);
+}
+
+function isCatalogItemMentioned(message: string, itemName: string) {
+  return message.toLocaleLowerCase("id-ID").includes(itemName.toLocaleLowerCase("id-ID"));
 }
