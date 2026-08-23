@@ -26,7 +26,7 @@ const EMPTY_FORM: DoctorForm = {
 };
 
 function errorMessage(error: unknown) {
-  return error instanceof ApiError ? error.message : "Operasi dokter gagal diproses.";
+  return error instanceof ApiError ? error.message : "Perubahan data dokter belum berhasil. Silakan coba lagi.";
 }
 
 export default function AdminDokterPage() {
@@ -140,7 +140,7 @@ export default function AdminDokterPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Dokter Spesialis</h1>
-          <p className="mt-1 text-sm text-[#6B7C72]">Kelola dokter dan bidang keahliannya di PostgreSQL.</p>
+          <p className="mt-1 text-sm text-[#6B7C72]">Kelola dokter dan bidang keahlian yang tampil kepada pengguna.</p>
         </div>
         <button onClick={openCreate} disabled={categories.length === 0} className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#0D5C46] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#0A4A38] disabled:cursor-not-allowed disabled:opacity-50">
           <Plus className="h-4 w-4" />
@@ -209,7 +209,7 @@ export default function AdminDokterPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold text-[#1A2421]">Hapus Dokter?</h2>
-            <p className="text-sm text-[#6B7C72]">Data ini akan dihapus permanen dari database.</p>
+            <p className="text-sm text-[#6B7C72]">Data ini akan dihapus permanen dan tidak dapat dipulihkan.</p>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setDeleteConfirm(null)} disabled={isSaving} className="flex-1 cursor-pointer rounded-xl border border-[#EAE4DC] py-2.5 text-sm font-semibold text-[#4A5D53]">Batal</button>
               <button onClick={() => handleDelete(deleteConfirm)} disabled={isSaving} className="flex-1 cursor-pointer rounded-xl bg-red-500 py-2.5 text-sm font-bold text-white disabled:opacity-60">{isSaving ? "Menghapus..." : "Hapus"}</button>
@@ -233,7 +233,7 @@ export default function AdminDokterPage() {
                 <FormField label="Pengalaman"><input required minLength={2} maxLength={100} value={form.experience} onChange={(event) => updateField("experience", event.target.value)} placeholder="10+ Tahun" className="form-input" /></FormField>
                 <FormField label="No. Registrasi"><input maxLength={120} value={form.registrationNumber} onChange={(event) => updateField("registrationNumber", event.target.value)} placeholder="STR/SIP" className="form-input" /></FormField>
               </div>
-              <FormField label="URL Foto"><input maxLength={500} value={form.image} onChange={(event) => updateField("image", event.target.value)} placeholder="/images/doctor.png" className="form-input" /></FormField>
+              <FormField label="Alamat Foto"><input maxLength={500} value={form.image} onChange={(event) => updateField("image", event.target.value)} placeholder="/images/doctor.png" className="form-input" /></FormField>
               <fieldset className="space-y-2">
                 <legend className="text-xs font-bold uppercase tracking-wider text-[#3A4F46]">Bidang Keahlian</legend>
                 <div className="flex flex-wrap gap-2">

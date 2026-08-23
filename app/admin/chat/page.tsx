@@ -11,8 +11,11 @@ import {
   UserRound,
 } from "lucide-react";
 import { ApiError, apiFetcher, apiRequest } from "@/lib/api-client";
+import MarkdownMessage from "@/components/MarkdownMessage";
+import RelatedCareCards from "@/components/RelatedCareCards";
 import type {
   AdminChatDetail,
+  AdminChatMessage,
   AdminChatSession,
   AdminChatStats,
   ApiResponse,
@@ -111,9 +114,9 @@ export default function AdminChatPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Chat & Lead</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Percakapan & Data Pasien</h1>
         <p className="mt-1 text-sm text-[#6B7C72]">
-          Tinjau percakapan chatbot, kondisi darurat, dan data calon pasien.
+          Tinjau percakapan GlucoAssistant, kondisi darurat, dan informasi untuk tindak lanjut.
         </p>
       </div>
 
@@ -121,9 +124,27 @@ export default function AdminChatPage() {
         <StatCard label="Total" value={stats?.total} />
         <StatCard label="Aktif" value={stats?.active} />
         <StatCard label="Selesai" value={stats?.completed} />
-        <StatCard label="Lead Lengkap" value={stats?.captured} />
+        <StatCard label="Data Pasien Lengkap" value={stats?.captured} />
         <StatCard label="Darurat" value={stats?.emergency} tone="danger" />
-        <StatCard label="Perlu Review" value={stats?.needsReview} tone="warning" />
+        <StatCard label="Perlu Ditinjau" value={stats?.needsReview} tone="warning" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard
+          label="Persentase Membantu"
+          value={stats?.helpfulRate === null || stats?.helpfulRate === undefined
+            ? "–"
+            : `${stats.helpfulRate}%`}
+        />
+        <StatCard label="👍 Membantu" value={stats?.feedbackHelpful} />
+        <StatCard label="👎 Tidak membantu" value={stats?.feedbackNotHelpful} tone="warning" />
+        <StatCard label="Sumber Jawaban Bermasalah" value={stats?.ragErrors} tone="danger" />
+        <StatCard
+          label="Rata-rata respons"
+          value={stats?.averageResponseLatencyMs === null || stats?.averageResponseLatencyMs === undefined
+            ? "–"
+            : formatDuration(stats.averageResponseLatencyMs)}
+        />
       </div>
 
       <form
@@ -139,7 +160,7 @@ export default function AdminChatPage() {
           <input
             value={searchDraft}
             onChange={(event) => setSearchDraft(event.target.value)}
-            placeholder="Cari nama, WhatsApp, atau isi chat"
+            placeholder="Cari nama, WhatsApp, atau isi percakapan"
             className="min-w-0 flex-1 bg-transparent py-2.5 text-sm outline-none"
           />
           <button
@@ -172,13 +193,13 @@ export default function AdminChatPage() {
           options={[["true", "Darurat"], ["false", "Tidak darurat"]]}
         />
         <FilterSelect
-          label="Semua lead"
+          label="Semua data pasien"
           value={leadCaptured}
           onChange={(value) => {
             setPage(1);
             setLeadCaptured(value);
           }}
-          options={[["true", "Lead lengkap"], ["false", "Belum lengkap"]]}
+          options={[["true", "Data lengkap"], ["false", "Belum lengkap"]]}
         />
       </form>
 
@@ -191,7 +212,7 @@ export default function AdminChatPage() {
       <div className="grid min-h-[560px] overflow-hidden rounded-2xl border border-[#EAE4DC] bg-white lg:grid-cols-[360px_1fr]">
         <section className="border-b border-[#EAE4DC] lg:border-b-0 lg:border-r">
           <div className="border-b border-[#EAE4DC] px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#6B7C72]">
-            {meta ? `${meta.total} session` : "Session chatbot"}
+            {meta ? `${meta.total} percakapan` : "Percakapan GlucoAssistant"}
           </div>
           <div className="max-h-[620px] divide-y divide-[#F2ECE4] overflow-y-auto">
             {sessions.map((session) => (
@@ -223,9 +244,9 @@ export default function AdminChatPage() {
                 </div>
               </button>
             ))}
-            {listLoading && <p className="p-8 text-center text-sm text-[#6B7C72]">Memuat session...</p>}
+            {listLoading && <p className="p-8 text-center text-sm text-[#6B7C72]">Memuat percakapan...</p>}
             {!listLoading && sessions.length === 0 && (
-              <p className="p-8 text-center text-sm text-[#6B7C72]">Tidak ada session sesuai filter.</p>
+              <p className="p-8 text-center text-sm text-[#6B7C72]">Tidak ada percakapan yang sesuai dengan pilihan pencarian.</p>
             )}
           </div>
           {meta && meta.totalPages > 1 && (
@@ -257,7 +278,7 @@ export default function AdminChatPage() {
           {!selectedId && (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center p-8 text-center text-[#6B7C72]">
               <MessageSquareText className="mb-3 h-9 w-9 text-[#0D5C46]/40" />
-              <p className="text-sm font-semibold">Pilih session untuk melihat histori dan data lead.</p>
+              <p className="text-sm font-semibold">Pilih percakapan untuk melihat riwayat dan data pasien.</p>
             </div>
           )}
           {selectedId && detailLoading && (
@@ -280,7 +301,7 @@ export default function AdminChatPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <select
-                      aria-label="Status session"
+                      aria-label="Status percakapan"
                       value={detail.status}
                       disabled={isSaving}
                       onChange={(event) => void updateSession({ status: event.target.value as ChatSessionStatus })}
@@ -289,19 +310,25 @@ export default function AdminChatPage() {
                       {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                     <select
-                      aria-label="Kualifikasi lead"
+                      aria-label="Status tindak lanjut pasien"
                       value={detail.lead?.qualificationStatus ?? ""}
                       disabled={isSaving}
                       onChange={(event) => void updateSession({ qualificationStatus: (event.target.value || null) as LeadQualificationStatus | null })}
                       className="rounded-xl border border-[#EAE4DC] bg-white px-3 py-2 text-xs font-semibold text-[#3A4F46] outline-none"
                     >
-                      <option value="">Belum dikualifikasi</option>
+                      <option value="">Belum dinilai</option>
                       {Object.entries(QUALIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div className="grid gap-3 rounded-xl bg-[#FAF8F5] p-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <LeadField
+                    label="Persetujuan Data"
+                    value={detail.consentAt
+                      ? `Disetujui ${formatDate(detail.consentAt)} · v${detail.consentVersion ?? "-"}`
+                      : "Belum disetujui"}
+                  />
                   <LeadField label="WhatsApp" value={detail.lead?.whatsapp} />
                   <LeadField label="Tipe Diabetes" value={detail.lead?.diabetesType} />
                   <LeadField label="Obat Saat Ini" value={detail.lead?.currentMedication} />
@@ -315,12 +342,21 @@ export default function AdminChatPage() {
                 {detail.messages.map((message) => (
                   <div key={message.id} className={message.role === "USER" ? "flex justify-end" : "flex justify-start"}>
                     <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === "USER" ? "rounded-tr-sm bg-[#0D5C46] text-white" : "rounded-tl-sm border border-[#EAE4DC] bg-white text-[#1A2421]"}`}>
-                      <p className="whitespace-pre-line">{message.content}</p>
+                      <MarkdownMessage variant={message.role === "USER" ? "inverse" : "default"}>
+                        {message.content}
+                      </MarkdownMessage>
+                      {message.relatedCare && <RelatedCareCards options={message.relatedCare} />}
                       {message.sources && message.sources.length > 0 && (
                         <p className="mt-2 border-t border-[#EAE4DC] pt-2 text-[10px] text-[#6B7C72]">
                           Sumber: {message.sources.map((source) => source.title).join(", ")}
                         </p>
                       )}
+                      {message.modelUsed && (
+                        <p className={`mt-2 text-[9px] ${message.role === "USER" ? "text-white/60" : "text-[#8A978F]"}`}>
+                          Mesin jawaban: {message.modelUsed}
+                        </p>
+                      )}
+                      {message.role === "ASSISTANT" && <MessageQuality message={message} />}
                       <time className={`mt-2 block text-[9px] ${message.role === "USER" ? "text-white/60" : "text-[#8A978F]"}`}>{formatDate(message.createdAt)}</time>
                     </div>
                   </div>
@@ -337,12 +373,47 @@ export default function AdminChatPage() {
   );
 }
 
-function StatCard({ label, value, tone = "default" }: { label: string; value?: number; tone?: "default" | "danger" | "warning" }) {
+function StatCard({ label, value, tone = "default" }: { label: string; value?: React.ReactNode; tone?: "default" | "danger" | "warning" }) {
   const toneClass = tone === "danger" ? "text-red-600" : tone === "warning" ? "text-amber-700" : "text-[#0D5C46]";
   return (
     <div className="rounded-2xl border border-[#EAE4DC] bg-white p-4">
       <p className={`text-2xl font-extrabold ${toneClass}`}>{value ?? "…"}</p>
       <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#6B7C72]">{label}</p>
+    </div>
+  );
+}
+
+function MessageQuality({ message }: { message: AdminChatMessage }) {
+  const metrics = [
+    message.intent ? `Topik ${intentLabel(message.intent)}` : undefined,
+    message.responseLatencyMs !== null
+      ? `Waktu jawaban ${formatDuration(message.responseLatencyMs)}`
+      : undefined,
+    message.gatewayLatencyMs !== null
+      ? `Waktu layanan AI ${formatDuration(message.gatewayLatencyMs)}`
+      : undefined,
+    message.gatewayAttempts !== null
+      ? `${message.gatewayAttempts} kali mencoba${message.fallbackUsed ? " · memakai layanan cadangan" : ""}`
+      : undefined,
+    message.retrievalStatus
+      ? `Sumber jawaban ${retrievalStatusLabel(message.retrievalStatus)} · ${message.retrievalMatchCount ?? 0} hasil`
+      : undefined,
+    message.retrievalTopSimilarity !== null
+      ? `Kecocokan sumber tertinggi ${Math.round(message.retrievalTopSimilarity * 100)}%`
+      : undefined,
+  ].filter(Boolean);
+
+  if (metrics.length === 0 && !message.feedback) return null;
+
+  return (
+    <div className="mt-2 space-y-1 border-t border-[#EAE4DC] pt-2 text-[9px] text-[#6B7C72]">
+      {metrics.length > 0 && <p>{metrics.join(" · ")}</p>}
+      {message.feedback && (
+        <p className={`font-bold ${message.feedback.rating === "HELPFUL" ? "text-emerald-700" : "text-red-600"}`}>
+          Penilaian: {message.feedback.rating === "HELPFUL" ? "Membantu" : "Tidak membantu"}
+          {message.feedback.reason ? ` · ${feedbackReasonLabel(message.feedback.reason)}` : ""}
+        </p>
+      )}
     </div>
   );
 }
@@ -375,4 +446,41 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatDuration(milliseconds: number) {
+  return milliseconds < 1_000
+    ? `${milliseconds} ms`
+    : `${(milliseconds / 1_000).toFixed(1)} dtk`;
+}
+
+function intentLabel(intent: string) {
+  return ({
+    EMERGENCY: "Darurat",
+    CARE_RECOMMENDATION: "Pilihan produk atau dokter",
+    MEDICATION_INFORMATION: "Informasi obat",
+    GLUCOSE_MONITORING: "Pemantauan gula darah",
+    LIFESTYLE_EDUCATION: "Pola hidup",
+    DIABETES_EDUCATION: "Edukasi diabetes",
+    GENERAL: "Pertanyaan umum",
+  } as Record<string, string>)[intent] ?? intent;
+}
+
+function retrievalStatusLabel(status: string) {
+  return ({
+    SUCCESS: "tersedia",
+    NOT_CONFIGURED: "belum diaktifkan",
+    ERROR: "bermasalah",
+    SKIPPED: "tidak diperlukan",
+  } as Record<string, string>)[status] ?? status.toLocaleLowerCase("id-ID");
+}
+
+function feedbackReasonLabel(reason: string) {
+  return ({
+    IRRELEVANT: "Tidak relevan",
+    UNCLEAR: "Tidak jelas",
+    TOO_LONG: "Terlalu panjang",
+    INCORRECT: "Informasi salah",
+    OTHER: "Lainnya",
+  } as Record<string, string>)[reason] ?? reason;
 }
