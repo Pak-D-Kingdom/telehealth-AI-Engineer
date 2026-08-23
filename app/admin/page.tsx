@@ -31,7 +31,7 @@ export default function AdminDashboard() {
       color: "bg-[#0D5C46]/10 text-[#0D5C46]",
     },
     {
-      label: "Lead Chatbot Lengkap",
+      label: "Data Pasien Lengkap",
       value: chatStatsResponse?.data.captured ?? 0,
       icon: MessageSquareText,
       href: "/admin/chat",
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-extrabold text-[#0D5C46] tracking-tight">
-          Dashboard
+          Ringkasan
         </h1>
         <p className="text-sm text-[#6B7C72] mt-1">
           Ringkasan data GlucoCare

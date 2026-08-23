@@ -9,8 +9,8 @@ const redHatText = Red_Hat_Text({
 });
 
 export const metadata: Metadata = {
-  title: "MySkin - Personalized Telehealth Skincare Care for Gen-Z",
-  description: "Solusi perawatan kulit via AI dan telehealth — simpel, cepat, dan teruji ilmiah khusus untuk masalah jerawat, dark spot, dan breakout.",
+  title: "GlucoCare | Edukasi Diabetes & Asisten Virtual",
+  description: "Informasi umum diabetes, pencatatan keluhan, deteksi tanda darurat, dan tindak lanjut manusia dengan persetujuan pengguna.",
 };
 
 export default function RootLayout({
@@ -29,5 +29,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-

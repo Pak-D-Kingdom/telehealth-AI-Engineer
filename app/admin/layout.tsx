@@ -16,10 +16,10 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin", label: "Ringkasan", icon: LayoutDashboard },
   { href: "/admin/produk", label: "Produk & Alat", icon: Package },
   { href: "/admin/dokter", label: "Dokter Spesialis", icon: Stethoscope },
-  { href: "/admin/chat", label: "Chat & Lead", icon: MessageSquareText },
+  { href: "/admin/chat", label: "Percakapan & Data Pasien", icon: MessageSquareText },
 ];
 
 function AdminShell({ children }: { children: React.ReactNode }) {
@@ -61,7 +61,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar — Desktop */}
       <aside className="hidden lg:flex flex-col w-60 bg-[#0D5C46] text-white shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <span className="text-sm font-extrabold tracking-tight">GlucoCare Admin</span>
+          <span className="text-sm font-extrabold tracking-tight">Pengelola GlucoCare</span>
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1">
@@ -104,7 +104,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
           />
           <aside className="relative flex flex-col w-64 bg-[#0D5C46] text-white z-10">
             <div className="h-16 flex items-center justify-between px-6 border-b border-white/10">
-              <span className="text-sm font-extrabold tracking-tight">GlucoCare Admin</span>
+              <span className="text-sm font-extrabold tracking-tight">Pengelola GlucoCare</span>
               <button onClick={() => setSidebarOpen(false)} className="text-white/60 hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
@@ -154,7 +154,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-bold text-[#0D5C46] lg:hidden">GlucoCare Admin</span>
+          <span className="text-sm font-bold text-[#0D5C46] lg:hidden">Pengelola GlucoCare</span>
         </header>
 
         {/* Page Content */}
