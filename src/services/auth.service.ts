@@ -18,7 +18,7 @@ export async function loginAdmin(email: string, password: string) {
   const passwordMatches = await Bun.password.verify(password, passwordHash);
 
   if (!user || !passwordMatches || !user.isActive || user.role !== "ADMIN") {
-    throw new AppError(401, "INVALID_CREDENTIALS", "Email atau password salah.");
+    throw new AppError(401, "INVALID_CREDENTIALS", "Email atau kata sandi salah.");
   }
 
   const now = new Date();

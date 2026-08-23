@@ -21,5 +21,5 @@ export const updateAdminChatSchema = z
       .optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
-    message: "Minimal satu field harus dikirim.",
+    message: "Pilih sedikitnya satu data yang ingin diubah.",
   });

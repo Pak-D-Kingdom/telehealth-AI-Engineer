@@ -103,7 +103,7 @@ export async function createDoctor(input: DoctorInput) {
   const slug = input.slug ?? createSlug(input.name);
 
   if (!slug) {
-    throw new AppError(422, "INVALID_SLUG", "Slug dokter tidak dapat dibuat.");
+    throw new AppError(422, "INVALID_SLUG", "Nama dokter belum dapat digunakan. Coba periksa kembali namanya.");
   }
 
   const doctor = await prisma.doctor.create({
@@ -174,7 +174,7 @@ async function ensureCategoriesExist(categoryIds: string[]) {
     throw new AppError(
       422,
       "INVALID_DOCTOR_CATEGORY",
-      "Satu atau lebih kategori dokter tidak ditemukan.",
+      "Satu atau lebih bidang keahlian yang dipilih tidak tersedia.",
     );
   }
 }

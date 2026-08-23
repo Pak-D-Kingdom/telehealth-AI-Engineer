@@ -85,7 +85,7 @@ export async function createProduct(input: ProductInput) {
   const slug = input.slug ?? createSlug(input.name);
 
   if (!slug) {
-    throw new AppError(422, "INVALID_SLUG", "Slug produk tidak dapat dibuat.");
+    throw new AppError(422, "INVALID_SLUG", "Nama produk belum dapat digunakan. Coba gunakan nama yang lebih jelas.");
   }
 
   return prisma.product.create({

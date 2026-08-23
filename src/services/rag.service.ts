@@ -5,17 +5,22 @@ import { prisma } from "../lib/prisma";
 
 const EMBEDDING_DIMENSIONS = 3_072;
 
-const geminiEmbeddingSchema = z.object({
-  embedding: z.object({
-    values: z.array(z.number().finite()).length(EMBEDDING_DIMENSIONS),
-  }),
+const embeddingResponseSchema = z.object({
+  data: z.array(z.object({
+    embedding: z.array(z.number().finite()).length(EMBEDDING_DIMENSIONS),
+  })).min(1),
 });
 
-const geminiErrorSchema = z.object({
-  error: z.object({
-    details: z.array(z.object({ reason: z.string().optional() }).passthrough()).optional(),
-  }),
-});
+const gatewayErrorSchema = z.object({
+  error: z.union([
+    z.string(),
+    z.object({
+      code: z.string().optional(),
+      type: z.string().optional(),
+      message: z.string().optional(),
+    }).passthrough(),
+  ]),
+}).passthrough();
 
 interface KnowledgeMatch {
   title: string;
@@ -24,13 +29,22 @@ interface KnowledgeMatch {
   similarity: number;
 }
 
-interface EmbeddingOptions {
-  taskType?: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
-  title?: string;
+export type RetrievalStatus = "SUCCESS" | "NOT_CONFIGURED" | "ERROR";
+
+export interface RetrievalMetrics {
+  status: RetrievalStatus;
+  latencyMs: number;
+  matchCount: number;
+  topSimilarity?: number;
 }
 
-export async function generateEmbedding(text: string, options: EmbeddingOptions = {}) {
-  if (!env.GEMINI_API_KEY) {
+export interface RetrievalResult {
+  references: KnowledgeMatch[];
+  metrics: RetrievalMetrics;
+}
+
+export async function generateEmbedding(text: string) {
+  if (!env.AI_GATEWAY_API_KEY || !env.AI_EMBEDDING_MODEL) {
     throw new AppError(
       503,
       "EMBEDDING_NOT_CONFIGURED",
@@ -40,57 +54,54 @@ export async function generateEmbedding(text: string, options: EmbeddingOptions 
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), env.AI_REQUEST_TIMEOUT_MS);
-  const model = encodeURIComponent(env.GEMINI_EMBEDDING_MODEL);
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": env.GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          model: `models/${env.GEMINI_EMBEDDING_MODEL}`,
-          content: { parts: [{ text: text.replace(/\s+/g, " ").trim() }] },
-          embedContentConfig: {
-            outputDimensionality: EMBEDDING_DIMENSIONS,
-            ...(options.taskType ? { taskType: options.taskType } : {}),
-            ...(options.title ? { title: options.title } : {}),
-          },
-        }),
-        signal: controller.signal,
+    const response = await fetch(`${env.AI_GATEWAY_BASE_URL}/embeddings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.AI_GATEWAY_API_KEY}`,
       },
-    );
+      body: JSON.stringify({
+        model: env.AI_EMBEDDING_MODEL,
+        input: text.replace(/\s+/g, " ").trim(),
+        dimensions: EMBEDDING_DIMENSIONS,
+        encoding_format: "float",
+      }),
+      signal: controller.signal,
+    });
 
     if (!response.ok) {
-      const errorBody = geminiErrorSchema.safeParse(await response.json().catch(() => undefined));
-      const providerReason = errorBody.success
-        ? errorBody.data.error.details?.find((detail) => detail.reason)?.reason
-        : undefined;
+      const providerError = parseGatewayError(await response.json().catch(() => undefined));
       console.error(
-        `Gemini embedding API gagal dengan status ${response.status}${providerReason ? ` (${providerReason})` : ""}.`,
+        `9Router embedding API gagal dengan status ${response.status}` +
+        `${providerError.code ? ` (${providerError.code})` : ""}` +
+        `${providerError.message ? `: ${providerError.message}` : "."}`,
       );
 
-      if (response.status === 401) {
+      if (response.status === 401 || response.status === 403) {
         throw new AppError(
           502,
-          "GEMINI_AUTH_ERROR",
-          "Gemini menolak GEMINI_API_KEY. Periksa status dan binding key di Google AI Studio.",
-          providerReason ? { providerReason } : undefined,
+          "EMBEDDING_GATEWAY_AUTH_ERROR",
+          "9Router menolak API key untuk layanan embedding.",
+          providerError,
         );
       }
 
-      throw new AppError(502, "EMBEDDING_PROVIDER_ERROR", "Gagal membuat embedding.");
+      throw new AppError(
+        502,
+        "EMBEDDING_PROVIDER_ERROR",
+        providerError.message ?? "Gagal membuat embedding.",
+        providerError,
+      );
     }
 
-    const result = geminiEmbeddingSchema.safeParse(await response.json());
+    const result = embeddingResponseSchema.safeParse(await response.json());
     if (!result.success) {
       throw new AppError(502, "INVALID_EMBEDDING_RESPONSE", "Embedding tidak valid.");
     }
 
-    return result.data.embedding.values;
+    return result.data.data[0]!.embedding;
   } catch (error) {
     if (error instanceof AppError) throw error;
     if (error instanceof Error && error.name === "AbortError") {
@@ -103,10 +114,28 @@ export async function generateEmbedding(text: string, options: EmbeddingOptions 
 }
 
 export async function retrieveRelevantContext(query: string, limit = 3) {
-  if (!env.GEMINI_API_KEY) return [];
+  const result = await retrieveRelevantContextWithMetrics(query, limit);
+  return result.references;
+}
+
+export async function retrieveRelevantContextWithMetrics(
+  query: string,
+  limit = 3,
+): Promise<RetrievalResult> {
+  const startedAt = Date.now();
+  if (!env.AI_GATEWAY_API_KEY || !env.AI_EMBEDDING_MODEL) {
+    return {
+      references: [],
+      metrics: {
+        status: "NOT_CONFIGURED",
+        latencyMs: Date.now() - startedAt,
+        matchCount: 0,
+      },
+    };
+  }
 
   try {
-    const embedding = await generateEmbedding(query, { taskType: "RETRIEVAL_QUERY" });
+    const embedding = await generateEmbedding(query);
     const vector = serializeVector(embedding);
     const matches = await prisma.$queryRaw<KnowledgeMatch[]>`
       SELECT
@@ -120,10 +149,25 @@ export async function retrieveRelevantContext(query: string, limit = 3) {
       LIMIT ${limit}
     `;
 
-    return matches.map(({ title, content, source }) => ({ title, content, source }));
+    return {
+      references: matches,
+      metrics: {
+        status: "SUCCESS",
+        latencyMs: Date.now() - startedAt,
+        matchCount: matches.length,
+        ...(matches[0] ? { topSimilarity: matches[0].similarity } : {}),
+      },
+    };
   } catch (error) {
     console.error("RAG tidak tersedia; percakapan dilanjutkan tanpa konteks.", error);
-    return [];
+    return {
+      references: [],
+      metrics: {
+        status: "ERROR",
+        latencyMs: Date.now() - startedAt,
+        matchCount: 0,
+      },
+    };
   }
 }
 
@@ -155,4 +199,16 @@ function serializeVector(values: number[]) {
     throw new AppError(422, "INVALID_EMBEDDING", "Dimensi embedding tidak valid.");
   }
   return `[${values.join(",")}]`;
+}
+
+function parseGatewayError(value: unknown) {
+  const result = gatewayErrorSchema.safeParse(value);
+  if (!result.success) return {};
+  if (typeof result.data.error === "string") {
+    return { message: result.data.error };
+  }
+  return {
+    code: result.data.error.code ?? result.data.error.type,
+    message: result.data.error.message,
+  };
 }

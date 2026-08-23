@@ -100,11 +100,12 @@ Respons ketika API dan database siap:
 | `FRONTEND_URL`      | `http://localhost:3000`      | Origin frontend yang diizinkan oleh CORS        |
 | `SESSION_TTL_DAYS`  | `7`                          | Masa berlaku session admin dalam hari           |
 | `CHAT_SESSION_TTL_DAYS` | `30`                     | Masa berlaku session chatbot dalam hari         |
-| `GROQ_API_KEY`      | -                            | API key Groq untuk jawaban dan ekstraksi lead   |
-| `GROQ_CHAT_MODEL`   | `llama-3.3-70b-versatile`    | Model utama chatbot                             |
-| `GROQ_EXTRACTION_MODEL` | `llama-3.1-8b-instant` | Model ekstraksi data lead                       |
-| `GEMINI_API_KEY`    | -                            | API key Gemini untuk embedding knowledge base   |
-| `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` | Model embedding knowledge base                  |
+| `AI_GATEWAY_BASE_URL` | `https://9router.sincan.dev/v1` | Endpoint OpenAI-compatible 9Router           |
+| `AI_GATEWAY_API_KEY` | -                           | API key yang dibuat pada dashboard 9Router      |
+| `AI_CHAT_MODEL`     | -                             | Model 9Router untuk jawaban chatbot             |
+| `AI_CHAT_FALLBACK_MODELS` | -                    | Daftar model fallback dipisahkan koma            |
+| `AI_EXTRACTION_MODEL` | mengikuti `AI_CHAT_MODEL`  | Model 9Router untuk ekstraksi data lead          |
+| `AI_EMBEDDING_MODEL` | -                           | Model 9Router untuk embedding knowledge base    |
 | `AI_REQUEST_TIMEOUT_MS` | `30000`                  | Batas waktu request provider AI                 |
 | `ADMIN_NAME`        | `Telehealth Admin`           | Nama admin yang dibuat oleh seed                |
 | `ADMIN_EMAIL`       | `admin@glucocare.id`         | Email login admin development                   |
@@ -113,6 +114,23 @@ Respons ketika API dan database siap:
 Port database menggunakan `5434` agar tidak bentrok dengan instalasi PostgreSQL lokal yang biasanya memakai `5432`. Di dalam container, PostgreSQL tetap menggunakan port `5432`.
 
 > Kredensial contoh hanya untuk development lokal. Gunakan secret yang kuat dan jangan commit `.env` untuk staging atau production.
+
+Semua trafik AI melewati satu gateway 9Router. Backend tidak lagi menyimpan API key
+provider upstream seperti Groq, Gemini, atau OpenAI. Ambil model ID yang tersedia dari
+endpoint `GET /models` milik 9Router. Model embedding memiliki katalog terpisah pada
+`GET /models/embedding`; jangan menggunakan alias combo/chat sebagai model embedding.
+Chat mencoba ulang error jaringan/5xx satu kali per model, lalu berpindah ke fallback.
+Health state dicatat terpisah per model dan model yang berhasil dipakai disimpan pada pesan.
+
+Model embedding harus menghasilkan tepat 3072 dimensi agar kompatibel dengan kolom
+`vector(3072)`. Setelah mengganti model embedding, jalankan kembali
+`bun run db:seed:knowledge` supaya seluruh dokumen dan query memakai ruang embedding yang sama.
+
+Setelah mengisi API key dan model ID, verifikasi koneksi, daftar model, chat, dan embedding:
+
+```bash
+bun run test:ai-gateway
+```
 
 ## Prisma
 
@@ -144,13 +162,13 @@ Buka Prisma Studio untuk melihat data:
 bun run db:studio
 ```
 
-Seed bersifat idempotent dan dapat dijalankan kembali. Seed akan memperbarui akun admin berdasarkan environment serta membuat data awal produk, dokter demo, dan kategori:
+Seed bersifat idempotent dan dapat dijalankan kembali. Seed akan memperbarui akun admin berdasarkan environment serta membuat 14 produk, 12 dokter demo, dan 4 kategori layanan dengan format yang disesuaikan untuk konteks Indonesia:
 
 ```bash
 bun run db:seed
 ```
 
-Data dokter dari seed adalah data demo dan bukan identitas tenaga medis yang telah diverifikasi.
+Data dokter, nomor registrasi, produk, dan harga dari seed adalah data demo. Seluruhnya bukan identitas tenaga medis, izin edar, katalog, atau harga pasar yang telah diverifikasi.
 
 ## Autentikasi Admin
 
@@ -202,11 +220,50 @@ Endpoint chatbot publik (menggunakan cookie session HTTP-only):
 | `POST`   | `/api/chat/stream`       | Mengirim pesan dengan respons SSE streaming     |
 | `POST`   | `/api/chat/retry`        | Mencoba ulang pesan terakhir via JSON            |
 | `POST`   | `/api/chat/retry/stream` | Mencoba ulang pesan terakhir via SSE             |
+| `POST`   | `/api/chat/messages/:messageId/feedback` | Menyimpan feedback jawaban AI      |
 | `GET`    | `/api/chat/status`       | Status provider dan jeda pemulihan kuota        |
 | `DELETE` | `/api/chat`              | Menutup session untuk percakapan baru            |
 
 Event SSE yang dikirim adalah `meta`, `token`, `done`, atau `error`. Event `meta` dan `done`
-menyertakan referensi knowledge base yang digunakan.
+menyertakan referensi knowledge base yang digunakan. Untuk permintaan rekomendasi obat,
+produk, atau dokter dalam domain diabetes, respons juga dapat memuat `relatedCare` berisi
+produk dan profil dokter aktif yang cocok secara topik. Metadata ini disimpan bersama pesan
+agar kartu yang sama dapat dipulihkan dari histori dan ditinjau admin.
+
+`relatedCare` adalah pencocokan katalog deterministik, bukan output bebas model AI. Produk
+resep diberi peringatan khusus dan seluruh pilihan disertai disclaimer bahwa diagnosis,
+dosis, interaksi, serta kecocokan terapi harus dinilai tenaga medis. Kondisi darurat tidak
+pernah menampilkan pilihan katalog.
+
+Request ke endpoint kirim dan retry (`POST /api/chat`, `POST /api/chat/stream`,
+`POST /api/chat/retry`, serta `POST /api/chat/retry/stream`) wajib menyertakan
+`consentToDataProcessing: true`. Waktu dan versi consent dicatat pada session sebelum pesan
+atau data lead disimpan. Pada retry session lama, consent eksplisit ini juga memperbarui session
+yang belum memiliki catatan consent. UI menjelaskan bahwa pemrosesan AI melewati gateway pihak
+ketiga. Nomor WhatsApp lead dinormalisasi ke format `+62` dan divalidasi.
+
+Setiap jawaban asisten menyimpan quality telemetry: intent, total latency, latency gateway,
+jumlah attempt, penggunaan fallback, status RAG, latency retrieval, jumlah referensi, serta
+top similarity. Pengguna dapat memberi rating `HELPFUL` atau `NOT_HELPFUL`; rating negatif
+wajib menyertakan alasan. Feedback hanya dapat diberikan pada pesan asisten yang dimiliki
+session cookie aktif. Ringkasan feedback dan telemetry tersedia pada dashboard admin chat.
+
+Dataset regresi pada `data/evaluation/chat-cases.json` memuat 60 kasus Bahasa Indonesia.
+Mode offline memeriksa emergency, intent, dan pemicu katalog tanpa memanggil provider:
+
+```bash
+bun run test:eval
+```
+
+Live evaluation memanggil 9Router. Batasi kasus atau bandingkan beberapa model dengan
+`EVAL_LIMIT`, `EVAL_CATEGORY`, dan `EVAL_MODELS`:
+
+```bash
+EVAL_LIMIT=10 EVAL_MODELS=model-a,model-b bun run test:eval:live
+```
+
+Live evaluation dapat memakai kuota provider dan sengaja keluar dengan status gagal ketika
+sebuah model tidak memenuhi guardrail atau kriteria jawaban.
 
 Endpoint autentikasi:
 
@@ -244,7 +301,6 @@ Integration test memeriksa health check, data publik, proteksi route admin, logi
 
 ## Perintah yang Tersedia
 
-vcc
 | Perintah | Keterangan |
 | --- | --- |
 | `bun install` | Menginstal dependency dan generate Prisma Client |
@@ -259,7 +315,12 @@ vcc
 | `bun run db:migrate -- --name ...` | Membuat dan menjalankan migration development |
 | `bun run db:deploy` | Menjalankan migration untuk deployment |
 | `bun run db:seed` | Mengisi atau memperbarui data awal |
+| `bun run db:seed:knowledge` | Membuat ulang embedding knowledge base melalui 9Router |
 | `bun run db:studio` | Membuka Prisma Studio |
 | `bun run test` | Menjalankan integration test API |
+| `bun run test:eval` | Menjalankan 60 kasus evaluasi deterministik tanpa provider |
+| `bun run test:eval:live` | Menilai jawaban model 9Router dengan evaluation dataset |
+| `bun run test:ai-gateway` | Memeriksa koneksi, model, chat, dan embedding 9Router |
+| `bun run test:e2e:chat` | Menjalankan pengujian chatbot end-to-end |
 
 > Proyek ini menggunakan Bun sebagai package manager. Jangan menjalankan `npm install` agar tidak membuat lockfile lain.

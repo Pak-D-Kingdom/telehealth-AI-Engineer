@@ -5,6 +5,11 @@ import { randomUUID } from "node:crypto";
 import { app } from "../src/app";
 import { prisma } from "../src/lib/prisma";
 import { upsertKnowledgeDocument } from "../src/services/rag.service";
+import { findRelatedCareOptions } from "../src/services/care-catalog.service";
+import {
+  CHAT_SESSION_COOKIE_NAME,
+  hashChatSessionToken,
+} from "../src/utils/chat-session";
 
 let server: Server;
 let baseUrl: string;
@@ -76,13 +81,13 @@ describe("Telehealth API", () => {
       meta: { total: number };
     };
     expect(productsResponse.status).toBe(200);
-    expect(productsBody.data.length).toBeGreaterThanOrEqual(4);
-    expect(productsBody.meta.total).toBeGreaterThanOrEqual(4);
+    expect(productsBody.data.length).toBeGreaterThanOrEqual(14);
+    expect(productsBody.meta.total).toBeGreaterThanOrEqual(14);
 
     const doctorsResponse = await apiRequest("/api/doctors");
     const doctorsBody = (await doctorsResponse.json()) as { data: unknown[] };
     expect(doctorsResponse.status).toBe(200);
-    expect(doctorsBody.data.length).toBeGreaterThanOrEqual(4);
+    expect(doctorsBody.data.length).toBeGreaterThanOrEqual(12);
   });
 
   test("pgvector menyimpan knowledge base secara idempotent", async () => {
@@ -118,13 +123,76 @@ describe("Telehealth API", () => {
     expect((await apiRequest("/api/admin/chat/sessions")).status).toBe(401);
   });
 
+  test("permintaan obat diabetes menghasilkan produk dan dokter terkait dari katalog aktif", async () => {
+    const related = await findRelatedCareOptions(
+      "Rekomendasikan obat untuk diabetes tipe 2 dan dokter yang bisa saya konsultasikan.",
+    );
+
+    expect(related?.products.some((product) => /metformin/i.test(product.name))).toBe(true);
+    expect(related?.products.find((product) => /metformin/i.test(product.name))?.requiresPrescription)
+      .toBe(true);
+    expect(related?.doctors.length).toBeGreaterThan(0);
+    expect(related?.disclaimer).toContain("bukan diagnosis");
+  });
+
+  test("permintaan obat lanjutan menggunakan konteks diabetes dan menghasilkan katalog aktif", async () => {
+    const related = await findRelatedCareOptions(
+      "Ada recommend obat ga ya?",
+      "Saya ingin mengetahui perawatan diabetes tipe 2.",
+    );
+
+    expect(related?.products.some((product) => /metformin/i.test(product.name))).toBe(true);
+    expect(related?.products.some((product) => /\(Demo\)/i.test(product.name))).toBe(true);
+    expect(related?.doctors.length).toBeGreaterThan(0);
+  });
+
+  test("retry mencatat consent eksplisit pada session lama", async () => {
+    const legacyToken = randomUUID();
+    const legacySession = await prisma.chatSession.create({
+      data: {
+        tokenHash: hashChatSessionToken(legacyToken),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const requestRetry = (body: Record<string, unknown>) => fetch(`${baseUrl}/api/chat/retry`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: `${CHAT_SESSION_COOKIE_NAME}=${legacyToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    try {
+      const missingConsentResponse = await requestRetry({});
+      expect(missingConsentResponse.status).toBe(422);
+      expect(
+        (await prisma.chatSession.findUnique({ where: { id: legacySession.id } }))?.consentAt,
+      ).toBeNull();
+
+      const acceptedRetryResponse = await requestRetry({ consentToDataProcessing: true });
+      expect(acceptedRetryResponse.status).toBe(409);
+      expect(await acceptedRetryResponse.json()).toMatchObject({
+        error: { code: "CHAT_NOT_RETRYABLE" },
+      });
+
+      const updatedSession = await prisma.chatSession.findUnique({
+        where: { id: legacySession.id },
+      });
+      expect(updatedSession?.consentAt).toBeInstanceOf(Date);
+      expect(updatedSession?.consentVersion).toBe("2026-08-24");
+    } finally {
+      await prisma.chatSession.deleteMany({ where: { id: legacySession.id } });
+    }
+  });
+
   test("chat membuat sesi aman, menangani kondisi darurat, dan melindungi histori", async () => {
     const providerStatusResponse = await apiRequest("/api/chat/status");
     const providerStatusBody = (await providerStatusResponse.json()) as {
       data: { provider: string; status: string };
     };
     expect(providerStatusResponse.status).toBe(200);
-    expect(providerStatusBody.data.provider).toBe("groq");
+    expect(providerStatusBody.data.provider).toBe("9router");
     expect(["READY", "NOT_CONFIGURED"]).toContain(providerStatusBody.data.status);
 
     const missingHistoryResponse = await apiRequest("/api/chat");
@@ -132,39 +200,117 @@ describe("Telehealth API", () => {
 
     const invalidMessageResponse = await apiRequest("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message: "" }),
+      body: JSON.stringify({ message: "", consentToDataProcessing: true }),
     });
     expect(invalidMessageResponse.status).toBe(422);
 
+    const missingConsentResponse = await apiRequest("/api/chat", {
+      method: "POST",
+      body: JSON.stringify({ message: "Halo" }),
+    });
+    expect(missingConsentResponse.status).toBe(422);
+
     const emergencyResponse = await apiRequest("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message: "Pasien diabetes tiba-tiba pingsan dan kejang." }),
+      body: JSON.stringify({
+        message: "Pasien diabetes tiba-tiba pingsan dan kejang.",
+        consentToDataProcessing: true,
+      }),
     });
     const emergencyBody = (await emergencyResponse.json()) as {
       data: {
+        messageId: string;
         sessionId: string;
         reply: string;
         leadComplete: boolean;
         isEmergency: boolean;
         sources: unknown[];
+        relatedCare?: unknown;
       };
     };
     expect(emergencyResponse.status).toBe(200);
     expect(emergencyBody.data.isEmergency).toBe(true);
     expect(emergencyBody.data.reply).toContain("119");
     expect(emergencyBody.data.sources).toEqual([]);
+    expect(emergencyBody.data.relatedCare).toBeUndefined();
     createdChatSessionId = emergencyBody.data.sessionId;
     chatCookie = emergencyResponse.headers.get("set-cookie")?.split(";", 1)[0] ?? "";
     expect(chatCookie).toStartWith("telehealth_chat_session=");
 
+    const incompleteFeedbackResponse = await apiRequest(
+      `/api/chat/messages/${emergencyBody.data.messageId}/feedback`,
+      {
+        method: "POST",
+        body: JSON.stringify({ rating: "NOT_HELPFUL" }),
+      },
+    );
+    expect(incompleteFeedbackResponse.status).toBe(422);
+
+    const helpfulFeedbackResponse = await apiRequest(
+      `/api/chat/messages/${emergencyBody.data.messageId}/feedback`,
+      {
+        method: "POST",
+        body: JSON.stringify({ rating: "HELPFUL" }),
+      },
+    );
+    expect(helpfulFeedbackResponse.status).toBe(200);
+
+    const feedbackResponse = await apiRequest(
+      `/api/chat/messages/${emergencyBody.data.messageId}/feedback`,
+      {
+        method: "POST",
+        body: JSON.stringify({ rating: "NOT_HELPFUL", reason: "UNCLEAR" }),
+      },
+    );
+    expect(feedbackResponse.status).toBe(200);
+    expect(await feedbackResponse.json()).toMatchObject({
+      data: {
+        messageId: emergencyBody.data.messageId,
+        rating: "NOT_HELPFUL",
+        reason: "UNCLEAR",
+      },
+    });
+
+    const foreignFeedbackResponse = await apiRequest(
+      `/api/chat/messages/${randomUUID()}/feedback`,
+      {
+        method: "POST",
+        body: JSON.stringify({ rating: "HELPFUL" }),
+      },
+    );
+    expect(foreignFeedbackResponse.status).toBe(404);
+
     const historyResponse = await apiRequest(`/api/chat/${createdChatSessionId}`);
     const historyBody = (await historyResponse.json()) as {
-      data: { messages: Array<{ id: string; role: string; content: string; sources: unknown[] }> };
+      data: {
+        consentGranted: boolean;
+        messages: Array<{
+          id: string;
+          role: string;
+          content: string;
+          sources: unknown[];
+          feedback?: { rating: string; reason?: string };
+        }>;
+      };
     };
     expect(historyResponse.status).toBe(200);
     expect(historyBody.data.messages).toHaveLength(2);
+    expect(historyBody.data.consentGranted).toBe(true);
     expect(historyBody.data.messages[1]?.role).toBe("assistant");
     expect(historyBody.data.messages[1]?.sources).toEqual([]);
+    expect(historyBody.data.messages[1]?.feedback).toMatchObject({
+      rating: "NOT_HELPFUL",
+      reason: "UNCLEAR",
+    });
+
+    const emergencyMessage = await prisma.chatMessage.findUnique({
+      where: { id: emergencyBody.data.messageId },
+    });
+    expect(emergencyMessage?.intent).toBe("EMERGENCY");
+    expect(emergencyMessage?.responseLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(emergencyMessage?.gatewayAttempts).toBe(0);
+    expect(emergencyMessage?.fallbackUsed).toBe(false);
+    expect(emergencyMessage?.retrievalStatus).toBe("SKIPPED");
 
     await prisma.chatMessage.update({
       where: { id: historyBody.data.messages[1]!.id },
@@ -180,7 +326,10 @@ describe("Telehealth API", () => {
 
     const streamResponse = await apiRequest("/api/chat/stream", {
       method: "POST",
-      body: JSON.stringify({ message: "Pasien diabetes tidak sadar dan sulit bernapas." }),
+      body: JSON.stringify({
+        message: "Pasien diabetes tidak sadar dan sulit bernapas.",
+        consentToDataProcessing: true,
+      }),
     });
     const streamBody = await streamResponse.text();
     expect(streamResponse.status).toBe(200);
@@ -190,7 +339,10 @@ describe("Telehealth API", () => {
     expect(streamBody).toContain("event: done");
     expect(streamBody).toContain("119");
 
-    const retryResponse = await apiRequest("/api/chat/retry", { method: "POST" });
+    const retryResponse = await apiRequest("/api/chat/retry", {
+      method: "POST",
+      body: JSON.stringify({ consentToDataProcessing: true }),
+    });
     expect(retryResponse.status).toBe(409);
     expect(await retryResponse.json()).toMatchObject({
       error: { code: "CHAT_NOT_RETRYABLE" },
@@ -231,7 +383,11 @@ describe("Telehealth API", () => {
     expect(meResponse.status).toBe(200);
 
     const chatStatsResponse = await apiRequest("/api/admin/chat/stats");
+    const chatStatsBody = (await chatStatsResponse.json()) as {
+      data: { feedbackNotHelpful: number; helpfulRate: number | null };
+    };
     expect(chatStatsResponse.status).toBe(200);
+    expect(chatStatsBody.data.feedbackNotHelpful).toBeGreaterThanOrEqual(1);
 
     const emergencySessionsResponse = await apiRequest(
       "/api/admin/chat/sessions?emergency=true&limit=100",
@@ -249,10 +405,22 @@ describe("Telehealth API", () => {
 
     const chatDetailResponse = await apiRequest(`/api/admin/chat/sessions/${createdChatSessionId}`);
     const chatDetailBody = (await chatDetailResponse.json()) as {
-      data: { messages: unknown[]; status: string; lead: { qualificationStatus: string } | null };
+      data: {
+        messages: Array<{
+          intent: string | null;
+          responseLatencyMs: number | null;
+          feedback: { rating: string; reason: string | null } | null;
+        }>;
+        status: string;
+        lead: { qualificationStatus: string } | null;
+      };
     };
     expect(chatDetailResponse.status).toBe(200);
     expect(chatDetailBody.data.messages).toHaveLength(4);
+    expect(chatDetailBody.data.messages[1]).toMatchObject({
+      intent: "EMERGENCY",
+      feedback: { rating: "NOT_HELPFUL", reason: "UNCLEAR" },
+    });
 
     const updateChatResponse = await apiRequest(`/api/admin/chat/sessions/${createdChatSessionId}`, {
       method: "PATCH",

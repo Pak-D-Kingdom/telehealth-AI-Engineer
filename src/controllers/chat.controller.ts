@@ -9,10 +9,21 @@ import {
   processChatMessage,
   resolveOrCreateChatSession,
   retryChatMessage,
+  submitChatMessageFeedback,
   type PreparedChatResponse,
 } from "../services/chat.service";
-import { getAIProviderStatus, streamChatCompletion } from "../services/ai.service";
-import { chatSessionParamsSchema, sendChatSchema } from "../validators/chat.validator";
+import {
+  getAIProviderStatus,
+  streamChatCompletion,
+  type AIRequestMetrics,
+} from "../services/ai.service";
+import {
+  chatMessageFeedbackParamsSchema,
+  chatMessageFeedbackSchema,
+  chatSessionParamsSchema,
+  retryChatSchema,
+  sendChatSchema,
+} from "../validators/chat.validator";
 import {
   CHAT_SESSION_COOKIE_NAME,
   chatSessionCookieOptions,
@@ -22,7 +33,7 @@ import {
 export const sendMessage: RequestHandler = async (req, res) => {
   const input = sendChatSchema.parse(req.body);
   const token = readChatToken(req.cookies?.[CHAT_SESSION_COOKIE_NAME]);
-  const session = await resolveOrCreateChatSession(token);
+  const session = await resolveOrCreateChatSession(token, input.consentToDataProcessing);
 
   res.cookie(CHAT_SESSION_COOKIE_NAME, session.token, chatSessionCookieOptions);
   const data = await processChatMessage(session, input.message);
@@ -32,7 +43,7 @@ export const sendMessage: RequestHandler = async (req, res) => {
 export const sendMessageStream: RequestHandler = async (req, res) => {
   const input = sendChatSchema.parse(req.body);
   const token = readChatToken(req.cookies?.[CHAT_SESSION_COOKIE_NAME]);
-  const session = await resolveOrCreateChatSession(token);
+  const session = await resolveOrCreateChatSession(token, input.consentToDataProcessing);
 
   res.cookie(CHAT_SESSION_COOKIE_NAME, session.token, chatSessionCookieOptions);
   const prepared = await prepareChatMessage(session, input.message);
@@ -40,15 +51,25 @@ export const sendMessageStream: RequestHandler = async (req, res) => {
 };
 
 export const retryMessage: RequestHandler = async (req, res) => {
+  const input = retryChatSchema.parse(req.body);
   const token = readChatToken(req.cookies?.[CHAT_SESSION_COOKIE_NAME]);
-  const data = await retryChatMessage(token);
+  const data = await retryChatMessage(token, input.consentToDataProcessing);
   res.status(200).json({ data });
 };
 
 export const retryMessageStream: RequestHandler = async (req, res) => {
+  const input = retryChatSchema.parse(req.body);
   const token = readChatToken(req.cookies?.[CHAT_SESSION_COOKIE_NAME]);
-  const prepared = await prepareChatRetry(token);
+  const prepared = await prepareChatRetry(token, input.consentToDataProcessing);
   await streamPreparedResponse(res, prepared);
+};
+
+export const feedbackMessage: RequestHandler = async (req, res) => {
+  const { messageId } = chatMessageFeedbackParamsSchema.parse(req.params);
+  const input = chatMessageFeedbackSchema.parse(req.body);
+  const token = readChatToken(req.cookies?.[CHAT_SESSION_COOKIE_NAME]);
+  const data = await submitChatMessageFeedback(token, messageId, input);
+  res.status(200).json({ data });
 };
 
 export const providerStatus: RequestHandler = (_req, res) => {
@@ -94,16 +115,19 @@ async function streamPreparedResponse(
   writeStreamEvent(res, "meta", {
     sessionId: prepared.sessionId,
     sources: prepared.sources,
+    relatedCare: prepared.relatedCare,
     isEmergency: prepared.isEmergency,
   });
 
   if (prepared.directReply) {
     writeStreamEvent(res, "token", { token: prepared.directReply });
     writeStreamEvent(res, "done", toStreamCompletion({
+      messageId: prepared.directReplyMessageId!,
       sessionId: prepared.sessionId,
       leadComplete: false,
       isEmergency: prepared.isEmergency,
       sources: prepared.sources,
+      relatedCare: prepared.relatedCare,
     }));
     res.end();
     return;
@@ -111,7 +135,12 @@ async function streamPreparedResponse(
 
   try {
     let reply = "";
-    for await (const token of streamChatCompletion(prepared.history, prepared.systemPrompt)) {
+    let modelUsed: string | undefined;
+    let aiMetrics: AIRequestMetrics | undefined;
+    for await (const token of streamChatCompletion(prepared.history, prepared.systemPrompt, {
+      onMetrics: (metrics) => { aiMetrics = metrics; },
+      onModelSelected: (model) => { modelUsed = model; },
+    })) {
       reply += token;
       writeStreamEvent(res, "token", { token });
     }
@@ -120,11 +149,11 @@ async function streamPreparedResponse(
       throw new AppError(
         502,
         "INVALID_AI_RESPONSE",
-        "Layanan AI tidak mengembalikan jawaban.",
+        "GlucoAssistant belum memberikan jawaban. Silakan coba lagi.",
       );
     }
 
-    const completed = await finalizeChatResponse(prepared, reply.trim());
+    const completed = await finalizeChatResponse(prepared, reply.trim(), modelUsed, aiMetrics);
     writeStreamEvent(res, "done", toStreamCompletion(completed));
   } catch (error) {
     writeStreamEvent(res, "error", serializeStreamError(error));
@@ -153,20 +182,24 @@ function serializeStreamError(error: unknown) {
   console.error("Stream chat gagal.", error);
   return {
     code: "INTERNAL_SERVER_ERROR",
-    message: "Terjadi kesalahan saat menerima jawaban chatbot.",
+    message: "Jawaban belum dapat diterima. Silakan coba lagi.",
   };
 }
 
 function toStreamCompletion(reply: {
+  messageId: string;
   sessionId: string;
   leadComplete: boolean;
   isEmergency: boolean;
   sources: unknown;
+  relatedCare?: unknown;
 }) {
   return {
+    messageId: reply.messageId,
     sessionId: reply.sessionId,
     leadComplete: reply.leadComplete,
     isEmergency: reply.isEmergency,
     sources: reply.sources,
+    relatedCare: reply.relatedCare,
   };
 }

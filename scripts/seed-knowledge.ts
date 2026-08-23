@@ -18,10 +18,7 @@ async function main() {
     const title = heading ?? basename(file, ".md").replace(/^\d+-/, "").replaceAll("-", " ");
 
     console.log(`Membuat embedding: ${file}`);
-    const embedding = await generateEmbedding(content, {
-      taskType: "RETRIEVAL_DOCUMENT",
-      title,
-    });
+    const embedding = await generateEmbedding(content);
     await upsertKnowledgeDocument({ title, content, source: file, embedding });
   }
 

@@ -22,6 +22,19 @@ enum ChatMessageRole {
   ASSISTANT
 }
 
+enum ChatFeedbackRating {
+  HELPFUL
+  NOT_HELPFUL
+}
+
+enum ChatFeedbackReason {
+  IRRELEVANT
+  UNCLEAR
+  TOO_LONG
+  INCORRECT
+  OTHER
+}
+
 enum LeadQualificationStatus {
   ELIGIBLE
   NEEDS_REVIEW
@@ -118,6 +131,8 @@ model ChatSession {
   status       ChatSessionStatus @default(ACTIVE)
   leadCaptured Boolean           @default(false) @map("lead_captured")
   isEmergency  Boolean           @default(false) @map("is_emergency")
+  consentAt    DateTime?         @map("consent_at")
+  consentVersion String?         @map("consent_version") @db.VarChar(40)
   expiresAt    DateTime          @map("expires_at")
   messages     ChatMessage[]
   lead         ChatLead?
@@ -130,16 +145,44 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id        String          @id @default(uuid()) @db.Uuid
-  sessionId String          @map("session_id") @db.Uuid
-  role      ChatMessageRole
-  content   String
-  sources   Json?           @db.JsonB
-  session   ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  createdAt DateTime        @default(now()) @map("created_at")
+  id                     String               @id @default(uuid()) @db.Uuid
+  sessionId              String               @map("session_id") @db.Uuid
+  role                   ChatMessageRole
+  content                String
+  sources                Json?                @db.JsonB
+  relatedCare            Json?                @map("related_care") @db.JsonB
+  modelUsed              String?              @map("model_used") @db.VarChar(160)
+  intent                 String?              @db.VarChar(60)
+  responseLatencyMs      Int?                 @map("response_latency_ms")
+  gatewayLatencyMs       Int?                 @map("gateway_latency_ms")
+  gatewayAttempts        Int?                 @map("gateway_attempts")
+  fallbackUsed           Boolean?             @map("fallback_used")
+  retrievalStatus        String?              @map("retrieval_status") @db.VarChar(40)
+  retrievalLatencyMs     Int?                 @map("retrieval_latency_ms")
+  retrievalMatchCount    Int?                 @map("retrieval_match_count")
+  retrievalTopSimilarity Float?               @map("retrieval_top_similarity")
+  session                ChatSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  feedback               ChatMessageFeedback?
+  createdAt              DateTime             @default(now()) @map("created_at")
 
   @@index([sessionId, createdAt])
+  @@index([intent])
   @@map("chat_messages")
+}
+
+model ChatMessageFeedback {
+  id        String             @id @default(uuid()) @db.Uuid
+  messageId String             @unique @map("message_id") @db.Uuid
+  rating    ChatFeedbackRating
+  reason    ChatFeedbackReason?
+  comment   String?            @db.VarChar(500)
+  message   ChatMessage        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  @@index([rating])
+  @@index([reason])
+  @@map("chat_message_feedback")
 }
 
 model ChatLead {

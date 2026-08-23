@@ -22,7 +22,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
       await prisma.userSession.delete({ where: { id: session.id } }).catch(() => undefined);
     }
 
-    throw new AppError(401, "INVALID_SESSION", "Session tidak valid atau sudah berakhir.");
+    throw new AppError(401, "INVALID_SESSION", "Waktu login telah berakhir. Silakan masuk kembali.");
   }
 
   req.authUser = {

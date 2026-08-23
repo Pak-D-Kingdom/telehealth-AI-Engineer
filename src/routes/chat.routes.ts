@@ -4,6 +4,7 @@ import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import {
   currentHistory,
   endSession,
+  feedbackMessage,
   historyBySessionId,
   providerStatus,
   retryMessage,
@@ -43,6 +44,7 @@ router.post("/", chatLimiter, sendMessage);
 router.post("/stream", chatLimiter, sendMessageStream);
 router.post("/retry", chatLimiter, retryMessage);
 router.post("/retry/stream", chatLimiter, retryMessageStream);
+router.post("/messages/:messageId/feedback", feedbackMessage);
 router.delete("/", endSession);
 router.get("/:sessionId", historyBySessionId);
 

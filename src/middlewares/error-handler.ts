@@ -7,12 +7,12 @@ interface PrismaLikeError {
   meta?: unknown;
 }
 
-export const notFoundHandler: RequestHandler = (req, _res, next) => {
+export const notFoundHandler: RequestHandler = (_req, _res, next) => {
   next(
     new AppError(
       404,
       "ROUTE_NOT_FOUND",
-      `Route ${req.method} ${req.originalUrl} tidak ditemukan.`,
+      "Halaman atau layanan yang diminta tidak ditemukan.",
     ),
   );
 };
@@ -38,7 +38,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     res.status(422).json({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Data request tidak valid.",
+        message: "Data yang dikirim belum lengkap atau tidak sesuai.",
         details: error.flatten(),
       },
     });
@@ -51,7 +51,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     res.status(409).json({
       error: {
         code: "DUPLICATE_RESOURCE",
-        message: "Data dengan nilai unik tersebut sudah tersedia.",
+        message: "Data yang sama sudah tersedia. Periksa kembali isian Anda.",
         details: prismaError.meta,
       },
     });
@@ -72,7 +72,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     res.status(422).json({
       error: {
         code: "INVALID_RELATION",
-        message: "Relasi atau identifier data tidak valid.",
+        message: "Pilihan data tidak valid. Periksa kembali isian Anda.",
       },
     });
     return;
@@ -82,7 +82,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   res.status(500).json({
     error: {
       code: "INTERNAL_SERVER_ERROR",
-      message: "Terjadi kesalahan pada server.",
+      message: "Layanan sedang mengalami gangguan. Silakan coba lagi.",
     },
   });
 };

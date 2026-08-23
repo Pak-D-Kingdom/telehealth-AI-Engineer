@@ -24,7 +24,7 @@ export const updateDoctorSchema = z
   .object(doctorFields)
   .partial()
   .refine((data) => Object.keys(data).length > 0, {
-    message: "Minimal satu field harus dikirim.",
+    message: "Isi sedikitnya satu data yang ingin diubah.",
   });
 
 export const publicDoctorQuerySchema = paginationSchema.extend({
