@@ -26,10 +26,10 @@ export default function ProductsShowcase({ onOpenChat }: ProductsShowcaseProps) 
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6 border-b border-[#EAE4DC] pb-10">
           <div className="max-w-xl space-y-3">
             <span className="text-xs font-extrabold text-[#E07A5F] uppercase tracking-widest">
-              Obat & Alat Kesehatan
+              Informasi Produk Kesehatan
             </span>
             <h2 className="text-3xl sm:text-5xl font-extrabold text-[#0D5C46] tracking-tight leading-tight">
-              Obat & Alat Monitor Gula Darah
+              Katalog Pendukung Pemantauan Gula Darah
             </h2>
           </div>
           <p className="text-sm sm:text-base text-[#4A5D53] max-w-md leading-relaxed">
@@ -101,7 +101,7 @@ export default function ProductsShowcase({ onOpenChat }: ProductsShowcaseProps) 
                   )}
                   <div className="pt-3 flex items-center gap-2 text-xs font-bold text-[#0D5C46] group-hover:text-[#E07A5F]">
                     <span className="border-b-2 border-[#0D5C46]/20 group-hover:border-[#E07A5F] pb-0.5 transition-colors">
-                      Tanya Konsultasi / Pesan Produk Ini
+                      Tanyakan Informasi Umum Produk Ini
                     </span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>

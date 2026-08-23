@@ -51,7 +51,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     throw new ApiError(
       0,
       "NETWORK_ERROR",
-      "Tidak dapat terhubung ke backend. Pastikan backend berjalan di port 4000.",
+      "Layanan GlucoCare belum dapat dihubungi. Periksa koneksi internet, lalu coba lagi.",
     );
   }
 
@@ -66,13 +66,13 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     throw new ApiError(
       response.status,
       payload?.error?.code ?? "API_ERROR",
-      payload?.error?.message ?? "Request ke backend gagal.",
+      payload?.error?.message ?? "Permintaan belum dapat diproses. Silakan coba lagi.",
       payload?.error?.details,
     );
   }
 
   if (payload === undefined) {
-    throw new ApiError(500, "INVALID_RESPONSE", "Backend mengembalikan respons yang tidak valid.");
+    throw new ApiError(500, "INVALID_RESPONSE", "Jawaban yang diterima tidak dapat dibaca. Silakan coba lagi.");
   }
 
   return payload;
@@ -105,7 +105,7 @@ export async function streamApiRequest(
     throw new ApiError(
       0,
       "NETWORK_ERROR",
-      "Tidak dapat terhubung ke backend. Pastikan backend berjalan di port 4000.",
+      "Layanan GlucoCare belum dapat dihubungi. Periksa koneksi internet, lalu coba lagi.",
     );
   }
 
@@ -114,13 +114,13 @@ export async function streamApiRequest(
     throw new ApiError(
       response.status,
       payload?.error?.code ?? "API_ERROR",
-      payload?.error?.message ?? "Request ke backend gagal.",
+      payload?.error?.message ?? "Permintaan belum dapat diproses. Silakan coba lagi.",
       payload?.error?.details,
     );
   }
 
   if (!response.body) {
-    throw new ApiError(500, "INVALID_RESPONSE", "Backend tidak mengembalikan stream jawaban.");
+    throw new ApiError(500, "INVALID_RESPONSE", "Jawaban belum dapat diterima. Silakan coba lagi.");
   }
 
   const reader = response.body.getReader();
@@ -160,7 +160,7 @@ function emitStreamEvent(frame: string, onEvent: (event: StreamEvent) => void) {
   try {
     data = JSON.parse(dataLines.join("\n"));
   } catch {
-    throw new ApiError(500, "INVALID_RESPONSE", "Format stream backend tidak valid.");
+    throw new ApiError(500, "INVALID_RESPONSE", "Jawaban yang diterima tidak dapat dibaca. Silakan coba lagi.");
   }
 
   if (event === "error") {
@@ -168,7 +168,7 @@ function emitStreamEvent(frame: string, onEvent: (event: StreamEvent) => void) {
     throw new ApiError(
       503,
       payload?.code ?? "STREAM_ERROR",
-      payload?.message ?? "Jawaban chatbot terputus.",
+      payload?.message ?? "Jawaban terputus. Silakan coba lagi.",
       payload?.details,
     );
   }

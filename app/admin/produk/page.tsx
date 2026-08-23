@@ -27,7 +27,7 @@ const EMPTY_FORM: ProductForm = {
 };
 
 function errorMessage(error: unknown) {
-  return error instanceof ApiError ? error.message : "Operasi produk gagal diproses.";
+  return error instanceof ApiError ? error.message : "Perubahan produk belum berhasil. Silakan coba lagi.";
 }
 
 export default function AdminProdukPage() {
@@ -124,7 +124,7 @@ export default function AdminProdukPage() {
             Produk & Alat
           </h1>
           <p className="mt-1 text-sm text-[#6B7C72]">
-            Kelola katalog yang tersimpan di PostgreSQL.
+            Kelola produk dan alat yang tampil di katalog.
           </p>
         </div>
         <button
@@ -231,7 +231,7 @@ export default function AdminProdukPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold text-[#1A2421]">Hapus Produk?</h2>
-            <p className="text-sm text-[#6B7C72]">Data ini akan dihapus permanen dari database.</p>
+            <p className="text-sm text-[#6B7C72]">Data ini akan dihapus permanen dan tidak dapat dipulihkan.</p>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setDeleteConfirm(null)} disabled={isSaving} className="flex-1 cursor-pointer rounded-xl border border-[#EAE4DC] py-2.5 text-sm font-semibold text-[#4A5D53]">Batal</button>
               <button onClick={() => handleDelete(deleteConfirm)} disabled={isSaving} className="flex-1 cursor-pointer rounded-xl bg-red-500 py-2.5 text-sm font-bold text-white disabled:opacity-60">
@@ -267,7 +267,7 @@ export default function AdminProdukPage() {
                   <input required type="number" min={0} max={2000000000} step={1} value={form.price} onChange={(event) => updateField("price", event.target.value)} placeholder="100000" className="form-input" />
                 </FormField>
               </div>
-              <FormField label="URL Gambar">
+              <FormField label="Alamat Gambar">
                 <input maxLength={500} value={form.image} onChange={(event) => updateField("image", event.target.value)} placeholder="/images/product.png" className="form-input" />
               </FormField>
               <FormField label="Spesifikasi">

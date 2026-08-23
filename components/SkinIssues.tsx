@@ -13,36 +13,36 @@ export default function SkinIssues({ onOpenChat }: SkinIssuesProps) {
     {
       id: "high_sugar",
       title: "Gula Darah Tinggi (Hiperglikemia)",
-      subtitle: "Kadar Gula Puasa >126 mg/dL",
+      subtitle: "Gula Darah Puasa di Atas 126 mg/dL",
       description: "Gejala badan sering lemas, gampang haus, dan kencing terus-menerus di malam hari. Butuh kontrol gula darah teratur.",
-      ingredients: "Metformin 500mg + Diet Low-GI",
+      ingredients: "Topik: hasil gula darah & gaya hidup",
       image: "/images/issue_high_sugar.png",
-      query: "Gue mau konsul keluhan kadar gula darah tinggi dan sering haus."
+      query: "Saya ingin bertanya tentang gula darah tinggi dan rasa haus yang sering muncul."
     },
     {
       id: "hba1c",
-      title: "Skrining HbA1c & Insulin",
-      subtitle: "Resistensi Insulin & Evaluasi 3 Bulan",
-      description: "Evaluasi rata-rata kadar gula darah 3 bulan terakhir untuk mencegah komplikasi organ jangka panjang.",
-      ingredients: "Alat Cek Digital + Chromium Complex",
+      title: "Memahami HbA1c & Insulin",
+      subtitle: "Gambaran Gula Darah 3 Bulan Terakhir",
+      description: "HbA1c membantu melihat gambaran rata-rata gula darah selama sekitar 3 bulan dan mendukung pemantauan rutin.",
+      ingredients: "Topik: HbA1c & pemantauan berkala",
       image: "/images/issue_hba1c.png",
       query: "Gimana cara mengevaluasi hasil tes HbA1c dan meningkatkan sensitivitas insulin?"
     },
     {
       id: "ulcer",
       title: "Luka Diabetes Sulit Sembuh",
-      subtitle: "Diabetic Ulcer & Skin Care",
-      description: "Perawatan khusus luka di area kaki agar jaringan kulit cepat beregenerasi dan tidak memicu infeksi jaringan.",
-      ingredients: "Gel Salep Anti-Bakteri Ulkus Diabetes",
+      subtitle: "Perawatan Luka dan Kulit",
+      description: "Luka kaki pada penyandang diabetes perlu dinilai tenaga medis, terutama bila merah, bengkak, bernanah, atau disertai demam.",
+      ingredients: "Topik: tanda bahaya luka diabetes",
       image: "/images/issue_ulcer.png",
-      query: "Luka di kaki gue basah dan lambat sembuh karena diabetes, mohon rekomendasi penanganan."
+      query: "Luka di kaki saya basah dan lambat sembuh karena diabetes. Apa yang perlu saya lakukan?"
     },
     {
       id: "diet",
-      title: "Pola Makan & Diet Diabetes",
-      subtitle: "Low Glycemic Index & Nutrition",
-      description: "Saran makanan sehat harian agar lonjakan kadar gula darah pasca makan tetap terkontrol secara alami.",
-      ingredients: "Serat Herbal Jamu Kayu Manis",
+      title: "Pola Makan untuk Diabetes",
+      subtitle: "Makanan yang Lebih Lambat Menaikkan Gula Darah",
+      description: "Panduan makanan sehari-hari untuk membantu mengurangi kenaikan gula darah setelah makan.",
+      ingredients: "Topik: pola makan & indeks glikemik",
       image: "/images/issue_diet.png",
       query: "Tolong kasih panduan diet diabetes dan pilihan makanan berindeks glikemik rendah."
     }
@@ -62,7 +62,7 @@ export default function SkinIssues({ onOpenChat }: SkinIssuesProps) {
             </h2>
           </div>
           <p className="text-sm sm:text-base text-[#4A5D53] max-w-md leading-relaxed">
-            Setiap gejala butuh kombinasi obat & panduan nutrisi yang tepat. Klik keluhanmu untuk mulai konsultasi bersama GlucoAssistant AI.
+            Setiap keluhan perlu dinilai sesuai kondisi pribadi. GlucoAssistant memberi informasi umum dan tidak menentukan obat, dosis, atau diagnosis.
           </p>
         </div>
 

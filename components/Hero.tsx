@@ -14,25 +14,25 @@ export default function Hero({ onOpenChat }: HeroProps) {
       title: "Gula Darah Tinggi",
       bg: "bg-[#EAF5EF]",
       image: "/images/card_sugar.png",
-      query: "Gue mau konsultasi keluhan kadar gula darah puasa tinggi dan sering lemas."
+      query: "Saya ingin bertanya tentang gula darah puasa yang tinggi dan badan yang sering lemas."
     },
     {
-      title: "Skrining HbA1c",
+      title: "HbA1c: Rata-rata Gula Darah",
       bg: "bg-[#F3EFEA]",
       image: "/images/card_hba1c.png",
       query: "Gimana cara kontrol kadar HbA1c dan sensitivitas insulin secara efektif?"
     },
     {
-      title: "Dokter Spesialis Sp.PD",
+      title: "Dokter Penyakit Dalam",
       bg: "bg-[#F5F2EA]",
       image: "/images/card_doctor.png",
-      query: "Gue mau konsul langsung dengan Dokter Spesialis Penyakit Dalam (Sp.PD)."
+      query: "Saya ingin mengetahui cara berkonsultasi dengan dokter spesialis penyakit dalam."
     },
     {
       title: "Luka & Pola Makan",
       bg: "bg-[#FCEFEF]",
       image: "/images/card_diet_ulcer.png",
-      query: "Ada rekomendasi gel perawatan luka diabetes dan saran pola makan low-GI?"
+      query: "Ada pilihan gel perawatan luka diabetes dan saran makanan dengan indeks glikemik rendah?"
     }
   ];
 
@@ -61,17 +61,17 @@ export default function Hero({ onOpenChat }: HeroProps) {
         {/* Centered Top Content with Clean Indonesian Copywriting */}
         <div className="text-center max-w-3xl mx-auto space-y-5">
           <p className="text-xs sm:text-sm font-semibold tracking-wide text-white/80">
-            Dipercaya <span className="font-bold text-white">500.000+</span> Pasien Diabetes Indonesia
+            Edukasi diabetes dan pencatatan keluhan dalam satu tempat
           </p>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.12]">
-            Layanan Medis,{" "}
-            <span className="text-[#88D39E] font-medium italic">didesain ulang</span>{" "}
-            untuk hidupmu.
+            Pahami Diabetes,{" "}
+            <span className="text-[#88D39E] font-medium italic">jalani hari</span>{" "}
+            dengan lebih tenang.
           </h1>
 
           <p className="text-sm sm:text-base lg:text-lg text-white/80 max-w-2xl mx-auto font-normal leading-relaxed">
-            Perawatan gula darah & diabetes online — simpel, langsung, dan dipimpin oleh Dokter Spesialis Penyakit Dalam (Sp.PD). Tanpa antrean klinik. Tanpa proses rumit. Hanya penanganan medis yang terbukti efektif.
+            Dapatkan informasi umum dari sumber pilihan, kenali tanda darurat, dan siapkan informasi untuk ditinjau tenaga medis. GlucoAssistant tidak menggantikan pemeriksaan dokter.
           </p>
         </div>
 

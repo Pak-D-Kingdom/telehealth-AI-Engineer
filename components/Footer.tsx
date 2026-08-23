@@ -20,41 +20,41 @@ export default function Footer() {
               />
             </div>
             <p className="text-sm text-[#B0C4B8] leading-relaxed max-w-sm">
-              Platform telehealth & konsultasi penyakit gula berbasis AI. Mengontrol kadar gula darah, merekomendasikan obat & alat monitor, serta merujuk ke Dokter Spesialis Penyakit Dalam (Sp.PD).
+              Platform edukasi diabetes dengan asisten virtual untuk informasi umum, pencatatan keluhan, tanda darurat, dan persiapan tindak lanjut oleh tim GlucoCare.
             </p>
           </div>
 
           {/* Nav Col 1 */}
           <div>
             <h4 className="font-bold text-sm text-white mb-4 uppercase tracking-wider">
-              Layanan Telehealth
+              Edukasi Diabetes
             </h4>
             <ul className="space-y-2.5 text-xs text-[#B0C4B8]">
               <li><a href="#gejala" className="hover:text-white transition-colors">Gejala Gula Darah Tinggi</a></li>
-              <li><a href="#gejala" className="hover:text-white transition-colors">Skrining Kadar HbA1c</a></li>
+              <li><a href="#gejala" className="hover:text-white transition-colors">Memahami Hasil HbA1c</a></li>
               <li><a href="#gejala" className="hover:text-white transition-colors">Perawatan Luka Diabetes (Ulkus)</a></li>
-              <li><a href="#gejala" className="hover:text-white transition-colors">Panduan Diet Low-GI</a></li>
+              <li><a href="#gejala" className="hover:text-white transition-colors">Panduan Makanan Berindeks Glikemik Rendah</a></li>
             </ul>
           </div>
 
           {/* Nav Col 2 */}
           <div>
             <h4 className="font-bold text-sm text-white mb-4 uppercase tracking-wider">
-              Keamanan Medis
+              Batas Layanan
             </h4>
             <ul className="space-y-2.5 text-xs text-[#B0C4B8]">
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-[#E07A5F]" />
-                <span>Rujukan Sp.PD-KEMD Resmi</span>
+                <span>Informasi umum, bukan diagnosis</span>
               </li>
-              <li>Sesuai Standar Kemenkes RI</li>
-              <li>Privasi Data Medis Terenkripsi</li>
+              <li>Data digunakan setelah Anda setuju</li>
+              <li>Arahan 119/IGD untuk tanda darurat</li>
             </ul>
           </div>
         </div>
 
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#8BA496]">
-          <p>© {new Date().getFullYear()} GlucoCare Diabetes Telehealth. Hak Cipta Dilindungi.</p>
+          <p>© {new Date().getFullYear()} GlucoCare. Hak Cipta Dilindungi.</p>
           <p className="flex items-center gap-1">
             Layanan Spesialis Diabetes & Manajemen Gula Darah
           </p>

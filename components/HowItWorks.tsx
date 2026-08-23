@@ -10,11 +10,11 @@ interface HowItWorksProps {
 
 export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
   const checklist = [
-    "Deteksi awal kadar gula darah puasa & HbA1c",
-    "Rekomendasi obat & alat monitor digital yang sesuai",
-    "Rujukan otomatis ke Dokter Spesialis Penyakit Dalam (Sp.PD)",
-    "Panduan pola makan low-GI & manajemen gaya hidup",
-    "Pencegahan komplikasi luka & ginjal sejak dini"
+    "Informasi umum hasil gula darah puasa & HbA1c",
+    "Pencatatan obat yang sedang digunakan tanpa mengubah terapi",
+    "Peringatan 119/IGD untuk tanda kondisi darurat",
+    "Panduan pola makan dan gaya hidup dari sumber pilihan",
+    "Data kontak hanya diproses setelah persetujuan"
   ];
 
   return (
@@ -60,11 +60,11 @@ export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
             {/* Top Right Headline */}
             <div className="space-y-3">
               <span className="text-xs font-extrabold tracking-[0.2em] text-[#E07A5F] uppercase">
-                Diabetes Telehealth Care
+                Pendampingan Diabetes
               </span>
 
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#0D5C46] tracking-tight leading-[1.15]">
-                <span className="text-[#E07A5F]">Stabilkan gula darah</span> dengan panduan AI dan rujukan dokter spesialis.
+                <span className="text-[#E07A5F]">Pahami kondisi gula darah</span> bersama asisten virtual dan tim manusia.
               </h2>
             </div>
 
@@ -73,7 +73,7 @@ export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
               <div className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-[#EAE3D9] border border-[#E2D9CC] shadow-sm">
                 <Image
                   src="/images/how_medication.png"
-                  alt="Obat Diabetes & Suplemen Herbal"
+                  alt="Ilustrasi pencatatan obat diabetes"
                   fill
                   className="object-cover hover:scale-105 transition-transform duration-700"
                 />
@@ -92,19 +92,19 @@ export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
             {/* Bottom Story & CTA */}
             <div className="space-y-6 max-w-xl">
               <h3 className="text-2xl sm:text-3xl font-extrabold text-[#0D5C46] tracking-tight leading-snug">
-                AI cerdas yang tahu kapan harus menyambungkanmu ke Dokter Spesialis
+                Asisten virtual yang membantu menyiapkan percakapan dengan tenaga medis
               </h3>
 
               <p className="text-sm sm:text-base text-[#4A5550] leading-relaxed">
-                GlucoAssistant AI mendeteksi kadar gula darah & gejalamu secara instan. Apabila terindikasi risiko komplikasi tinggi atau jika kamu merasa konsultasi AI belum cukup, kamu langsung dirujuk ke Dokter Spesialis Penyakit Dalam (Sp.PD) kami.
+                GlucoAssistant merangkum informasi yang kamu berikan dan menampilkan arahan darurat saat menemukan tanda berisiko. Data tindak lanjut baru disimpan setelah persetujuan dan tetap perlu ditinjau oleh tim manusia.
               </p>
 
               <div className="pt-2">
                 <button
-                  onClick={() => onOpenChat("Gue mau konsultasi keluhan kadar gula darah sekarang.")}
+                  onClick={() => onOpenChat("Saya ingin bertanya tentang keluhan gula darah saya.")}
                   className="inline-flex items-center justify-center bg-[#E07A5F] hover:bg-[#C9664B] text-white px-9 py-4 rounded-full font-bold text-sm sm:text-base transition-all shadow-md hover:shadow-lg active:scale-95 uppercase tracking-wider cursor-pointer"
                 >
-                  Mulai Konsultasi Diabetes Sekarang
+                  Mulai Tanya GlucoAssistant
                 </button>
               </div>
             </div>

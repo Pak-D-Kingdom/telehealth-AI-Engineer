@@ -14,7 +14,17 @@ import {
   X,
 } from "lucide-react";
 import { ApiError, apiRequest, streamApiRequest } from "@/lib/api-client";
-import type { ApiResponse } from "@/lib/api-types";
+import type {
+  ApiResponse,
+  ChatFeedback,
+  ChatFeedbackRating,
+  ChatFeedbackReason,
+  RelatedCareOptions,
+} from "@/lib/api-types";
+import ChatFeedbackControls from "@/components/ChatFeedbackControls";
+import ChatPanelSizeToggle from "@/components/ChatPanelSizeToggle";
+import MarkdownMessage from "@/components/MarkdownMessage";
+import RelatedCareCards from "@/components/RelatedCareCards";
 
 interface ChatSource {
   title: string;
@@ -31,6 +41,9 @@ interface Message {
   isStreaming?: boolean;
   failed?: boolean;
   persisted?: boolean;
+  persistedId?: string;
+  feedback?: ChatFeedback;
+  relatedCare?: RelatedCareOptions;
 }
 
 interface StoredMessage {
@@ -39,17 +52,20 @@ interface StoredMessage {
   content: string;
   sources: ChatSource[];
   createdAt: string;
+  feedback?: ChatFeedback;
+  relatedCare?: RelatedCareOptions;
 }
 
 interface ChatHistory {
   sessionId: string;
+  consentGranted: boolean;
   messages: StoredMessage[];
 }
 
 type ProviderState = "READY" | "RATE_LIMITED" | "UNAVAILABLE" | "NOT_CONFIGURED";
 
 interface ProviderStatus {
-  provider: "groq";
+  provider: "9router";
   model: string;
   status: ProviderState;
   retryAfterSeconds?: number;
@@ -63,10 +79,15 @@ interface StreamMeta {
   sessionId: string;
   sources: ChatSource[];
   isEmergency: boolean;
+  relatedCare?: RelatedCareOptions;
 }
 
 interface StreamToken {
   token: string;
+}
+
+interface StreamCompletion {
+  messageId: string;
 }
 
 interface ChatBotProps {
@@ -82,6 +103,8 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
   const [isSending, setIsSending] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [consentGranted, setConsentGranted] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [providerStatus, setProviderStatus] = useState<ProviderStatusView | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -99,7 +122,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
       });
     } catch {
       setProviderStatus({
-        provider: "groq",
+        provider: "9router",
         model: "",
         status: "UNAVAILABLE",
         retryAfterSeconds: 15,
@@ -111,6 +134,17 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isSending, chatError]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -133,6 +167,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
       try {
         const response = await apiRequest<ApiResponse<ChatHistory>>("/api/chat");
         if (!cancelled) {
+          setConsentGranted(response.data.consentGranted);
           setMessages(response.data.messages.map((message, index, all) => ({
             ...toUiMessage(message),
             failed: index === all.length - 1 && message.role === "user",
@@ -194,6 +229,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
           setMessages((previous) => updateMessage(previous, assistantMessageId, {
             sources: data.sources,
             isEmergency: data.isEmergency,
+            relatedCare: data.relatedCare,
           }).map((message) => message.id === userMessageId
             ? { ...message, persisted: true }
             : message));
@@ -209,20 +245,21 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
           }
         }
 
-        if (event === "done") {
+        if (event === "done" && isStreamCompletion(data)) {
           if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
           animationFrame = undefined;
           flushTokens();
           completed = true;
           setMessages((previous) => updateMessage(previous, assistantMessageId, {
             isStreaming: false,
+            persistedId: data.messageId,
             timestamp: formatTime(new Date()),
           }));
         }
       });
 
       if (!completed) {
-        throw new ApiError(502, "STREAM_INTERRUPTED", "Koneksi jawaban terputus sebelum selesai.");
+        throw new ApiError(502, "STREAM_INTERRUPTED", "Jawaban terputus sebelum selesai. Silakan coba lagi.");
       }
     } catch (error) {
       if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
@@ -237,6 +274,22 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     }
   }, [refreshProviderStatus]);
 
+  const submitFeedback = useCallback(async (
+    messageId: string,
+    rating: ChatFeedbackRating,
+    reason?: ChatFeedbackReason,
+  ) => {
+    const response = await apiRequest<ApiResponse<ChatFeedback & { messageId: string }>>(
+      `/api/chat/messages/${messageId}/feedback`,
+      { method: "POST", body: { rating, reason } },
+    );
+    setMessages((previous) => previous.map((message) =>
+      message.persistedId === messageId || message.id === messageId
+        ? { ...message, feedback: response.data }
+        : message,
+    ));
+  }, []);
+
   const sendMessage = useCallback(async (rawQuery: string) => {
     const query = rawQuery.trim();
     if (!query) return;
@@ -250,7 +303,11 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     };
 
     setMessages((previous) => [...previous, userMessage]);
-    await streamResponse("/api/chat/stream", { message: query }, userMessage.id);
+    await streamResponse(
+      "/api/chat/stream",
+      { message: query, consentToDataProcessing: true },
+      userMessage.id,
+    );
   }, [streamResponse]);
 
   useEffect(() => {
@@ -262,15 +319,12 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
     if (
       historyLoaded &&
       initialQuery &&
-      !isSending &&
-      !messages.some((message) => message.failed) &&
-      !isProviderBlocked(providerStatus, Date.now()) &&
       handledInitialQueryRef.current !== initialQuery
     ) {
       handledInitialQueryRef.current = initialQuery;
-      void sendMessage(initialQuery);
+      setInput(initialQuery);
     }
-  }, [historyLoaded, initialQuery, isOpen, isSending, messages, providerStatus, sendMessage]);
+  }, [historyLoaded, initialQuery, isOpen]);
 
   const failedMessage = useMemo(
     () => messages.findLast((message) => message.sender === "user" && message.failed),
@@ -279,17 +333,26 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
   const providerBlocked = isProviderBlocked(providerStatus, now);
 
   const handleSendMessage = (query = input) => {
-    if (isSending || !historyLoaded || failedMessage || providerBlocked || !query.trim()) return;
+    if (
+      isSending ||
+      !historyLoaded ||
+      !consentGranted ||
+      failedMessage ||
+      providerBlocked ||
+      !query.trim()
+    ) return;
     if (query === input) setInput("");
     void sendMessage(query);
   };
 
   const handleRetry = () => {
-    if (!failedMessage || isSending || providerBlocked) return;
+    if (!failedMessage || !consentGranted || isSending || providerBlocked) return;
     setMessages((previous) => updateMessage(previous, failedMessage.id, { failed: false }));
     void streamResponse(
       failedMessage.persisted ? "/api/chat/retry/stream" : "/api/chat/stream",
-      failedMessage.persisted ? {} : { message: failedMessage.text },
+      failedMessage.persisted
+        ? { consentToDataProcessing: true }
+        : { message: failedMessage.text, consentToDataProcessing: true },
       failedMessage.id,
     );
   };
@@ -306,6 +369,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
       await apiRequest<void>("/api/chat", { method: "DELETE" });
       setMessages([]);
       setInput("");
+      setConsentGranted(false);
       setHistoryLoaded(true);
       await refreshProviderStatus();
     } catch (error) {
@@ -329,47 +393,64 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
             </div>
             <div className="pr-1 text-left">
               <div className="text-sm font-extrabold leading-tight text-[#0D5C46]">GlucoAssistant</div>
-              <div className="text-[10px] font-semibold text-[#E07A5F]">by GlucoCare AI</div>
+              <div className="text-[10px] font-semibold text-[#E07A5F]">Asisten virtual GlucoCare</div>
             </div>
           </button>
         </div>
       )}
 
       {isOpen && (
-        <div className="fixed bottom-4 right-4 z-50 flex h-[620px] max-h-[88vh] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-3xl border border-[#E8E4DE] bg-white shadow-2xl sm:bottom-6 sm:right-6 sm:w-[420px]">
-          <header className="shrink-0 bg-[#0D5C46] px-4 py-3 text-white shadow-sm">
-            <div className="flex items-center justify-between">
+        <section
+          id="glucocare-chat-panel"
+          role="dialog"
+          aria-label="Percakapan dengan GlucoAssistant"
+          aria-modal="false"
+          className={`fixed inset-0 z-50 flex h-dvh w-full flex-col overflow-hidden overscroll-contain bg-white shadow-2xl transition-[width,height,border-radius] duration-300 ease-out motion-reduce:transition-none sm:inset-auto sm:bottom-6 sm:right-6 sm:max-h-[calc(100dvh-3rem)] sm:rounded-3xl sm:border sm:border-[#E8E4DE] ${
+            isExpanded
+              ? "sm:h-[min(760px,calc(100dvh-3rem))] sm:w-[min(760px,calc(100vw-3rem))]"
+              : "sm:h-[620px] sm:w-[420px]"
+          }`}
+        >
+          <header className="shrink-0 bg-[#0D5C46] px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white shadow-sm sm:py-3">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
               <button
                 type="button"
                 aria-label="Tutup percakapan"
+                title="Tutup percakapan"
                 onClick={onClose}
-                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
                 <X className="h-5 w-5" />
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center justify-center gap-2">
                 <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full border border-white/30">
                   <Image src="/images/glucocare_logo.svg" alt="GlucoAssistant" fill className="object-cover" />
                 </div>
-                <span className="text-sm font-bold tracking-tight">
-                  GlucoAssistant <span className="ml-0.5 text-[10px] font-normal text-[#F4A261]">AI Edukasi</span>
+                <span className="truncate text-sm font-bold tracking-tight">
+                  GlucoAssistant <span className="ml-0.5 hidden text-[10px] font-normal text-[#F4A261] min-[380px]:inline">Asisten Edukasi</span>
                 </span>
               </div>
-              <button
-                type="button"
-                aria-label="Mulai percakapan baru"
-                title="Mulai percakapan baru"
-                disabled={isSending || isResetting}
-                onClick={() => void handleNewConversation()}
-                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <MessageSquarePlus className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <ChatPanelSizeToggle
+                  isExpanded={isExpanded}
+                  onToggle={() => setIsExpanded((current) => !current)}
+                />
+                <button
+                  type="button"
+                  aria-label="Mulai percakapan baru"
+                  title="Mulai percakapan baru"
+                  disabled={isSending || isResetting}
+                  onClick={() => void handleNewConversation()}
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <MessageSquarePlus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <ProviderBadge status={providerStatus} now={now} />
           </header>
 
-          <div className="flex-1 space-y-6 overflow-y-auto bg-white p-4">
+          <div className={`flex-1 space-y-6 overflow-y-auto overscroll-contain bg-white p-4 ${isExpanded ? "sm:p-6" : ""}`}>
             {!historyLoaded && (
               <div className="flex h-full items-center justify-center text-xs font-semibold text-gray-400">
                 Memuat percakapan...
@@ -380,9 +461,9 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
               <div className="space-y-6 px-2 pt-4 text-center">
                 <div className="space-y-3">
                   <p className="text-sm font-medium leading-relaxed text-gray-700">
-                    Hai, aku <strong className="text-[#0D5C46]">GlucoAssistant</strong>. Aku membantu edukasi umum seputar diabetes, mengenali tanda darurat, dan mengarahkanmu ke tenaga medis.
+                    Hai, saya <strong className="text-[#0D5C46]">GlucoAssistant</strong>. Saya membantu menjelaskan diabetes dengan bahasa sederhana, mengenali tanda darurat, dan menemukan tenaga medis yang sesuai.
                   </p>
-                  <p className="text-sm text-gray-600">Pilih topik atau tulis pertanyaanmu.</p>
+                  <p className="text-sm text-gray-600">Pilih topik atau tulis pertanyaan Anda.</p>
                 </div>
                 <div className="space-y-3 pt-2">
                   <TopicButton
@@ -390,21 +471,21 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                     label="Apa arti hasil gula darah puasa saya?"
                     onClick={() => handleSendMessage("Apa arti hasil pemeriksaan gula darah puasa secara umum?")}
                     color="bg-teal-50 text-[#0D5C46]"
-                    disabled={isSending || providerBlocked}
+                    disabled={isSending || providerBlocked || !consentGranted}
                   />
                   <TopicButton
                     icon={<Stethoscope className="h-4 w-4" />}
                     label="Informasi umum tentang Metformin"
                     onClick={() => handleSendMessage("Jelaskan informasi umum tentang Metformin tanpa memberikan dosis atau resep.")}
                     color="bg-emerald-50 text-emerald-600"
-                    disabled={isSending || providerBlocked}
+                    disabled={isSending || providerBlocked || !consentGranted}
                   />
                   <TopicButton
                     icon={<Syringe className="h-4 w-4" />}
                     label="Luka diabetes lambat sembuh"
                     onClick={() => handleSendMessage("Luka diabetes saya lambat sembuh. Kapan saya perlu menemui dokter?")}
                     color="bg-orange-50 text-[#E07A5F]"
-                    disabled={isSending || providerBlocked}
+                    disabled={isSending || providerBlocked || !consentGranted}
                   />
                 </div>
               </div>
@@ -417,7 +498,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                   className={`space-y-2 ${message.sender === "user" ? "flex flex-col items-end" : "flex flex-col items-start"}`}
                 >
                   <div
-                    className={`max-w-[88%] text-sm leading-relaxed ${
+                    className={`max-w-[92%] text-sm leading-relaxed sm:max-w-[88%] ${isExpanded ? "sm:max-w-[82%]" : ""} ${
                       message.sender === "user"
                         ? `rounded-2xl rounded-tr-xs bg-[#0D5C46] px-4 py-3 text-white ${message.failed ? "ring-2 ring-red-300" : ""}`
                         : message.isEmergency
@@ -429,15 +510,26 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                     {message.isStreaming && !message.text ? (
                       <TypingIndicator />
                     ) : (
-                      <p className="whitespace-pre-line">
-                        {message.text}
+                      <div>
+                        <MarkdownMessage variant={message.sender === "user" ? "inverse" : "default"}>
+                          {message.text}
+                        </MarkdownMessage>
                         {message.isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-[#E07A5F] align-middle" />}
-                      </p>
+                      </div>
                     )}
                     {!message.isStreaming && message.sources && message.sources.length > 0 && (
                       <SourceList sources={message.sources} />
                     )}
+                    {!message.isStreaming && message.relatedCare && (
+                      <RelatedCareCards options={message.relatedCare} onSelect={handleSendMessage} />
+                    )}
                   </div>
+                  {message.sender === "ai" && !message.isStreaming && message.persistedId && (
+                    <ChatFeedbackControls
+                      value={message.feedback}
+                      onSubmit={(rating, reason) => submitFeedback(message.persistedId!, rating, reason)}
+                    />
+                  )}
                   <span className="px-1 text-[9px] text-gray-400">{message.timestamp}</span>
                 </div>
               ))}
@@ -449,7 +541,7 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                 {chatError && <p className="mt-1 text-amber-800">{chatError}</p>}
                 <button
                   type="button"
-                  disabled={isSending || providerBlocked}
+                  disabled={!consentGranted || isSending || providerBlocked}
                   onClick={handleRetry}
                   className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 font-bold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -467,7 +559,21 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
             <div ref={messagesEndRef} />
           </div>
 
-          <footer className="shrink-0 space-y-1 border-t border-gray-100 bg-white p-3">
+          <footer className={`shrink-0 space-y-1 border-t border-gray-100 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 ${isExpanded ? "sm:px-6 sm:py-4" : ""}`}>
+            {!consentGranted && (
+              <label className="mb-2 flex cursor-pointer items-start gap-2.5 rounded-xl border border-[#E8DFC0] bg-[#FFF9F3] px-3 py-2.5 text-[10px] leading-relaxed text-[#4A5550]">
+                <input
+                  type="checkbox"
+                  checked={consentGranted}
+                  onChange={(event) => setConsentGranted(event.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#0D5C46]"
+                />
+                <span>
+                  Saya setuju isi percakapan dan data kontak digunakan GlucoCare untuk menjawab
+                  pertanyaan dan tindak lanjut. Untuk membuat jawaban, GlucoCare memakai layanan AI pihak ketiga.
+                </span>
+              </label>
+            )}
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -479,26 +585,32 @@ export default function ChatBot({ isOpen, onOpen, onClose, initialQuery }: ChatB
                 type="text"
                 value={input}
                 maxLength={2000}
-                disabled={!historyLoaded || isSending || Boolean(failedMessage) || providerBlocked}
+                disabled={!historyLoaded || !consentGranted || isSending || Boolean(failedMessage) || providerBlocked}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder={failedMessage ? "Coba ulang pesan terakhir terlebih dahulu" : "Tanyakan gula darah, gejala, atau diabetes..."}
+                placeholder={
+                  !consentGranted
+                    ? "Setujui penggunaan data untuk mulai bertanya"
+                    : failedMessage
+                      ? "Coba ulang pesan terakhir terlebih dahulu"
+                      : "Tanyakan gula darah, gejala, atau diabetes..."
+                }
                 className="flex-1 rounded-full border border-transparent bg-[#F0F2F5] px-4 py-2.5 text-xs text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-gray-300 focus:bg-white disabled:opacity-60 sm:text-sm"
               />
               <button
                 type="submit"
                 aria-label="Kirim pesan"
-                disabled={!historyLoaded || !input.trim() || isSending || Boolean(failedMessage) || providerBlocked}
+                disabled={!historyLoaded || !consentGranted || !input.trim() || isSending || Boolean(failedMessage) || providerBlocked}
                 className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#E07A5F] text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-200"
               >
                 <Send className="h-4 w-4" />
               </button>
             </form>
             <div className="flex items-center justify-between px-4 text-[9px] text-gray-400">
-              <span>AI edukasi, bukan pengganti konsultasi dokter.</span>
+              <span>Informasi umum, bukan pengganti konsultasi dokter.</span>
               <span>{input.length}/2000</span>
             </div>
           </footer>
-        </div>
+        </section>
       )}
     </>
   );
@@ -520,7 +632,7 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
   return (
     <div className="mt-3 border-t border-gray-200 pt-2 text-[10px] text-gray-500">
       <p className="mb-1.5 flex items-center gap-1 font-bold uppercase tracking-wide text-[#0D5C46]">
-        <BookOpen className="h-3 w-3" /> Referensi knowledge base
+        <BookOpen className="h-3 w-3" /> Sumber informasi
       </p>
       <ul className="space-y-1">
         {sources.map((source) => (
@@ -574,8 +686,11 @@ function toUiMessage(message: StoredMessage): Message {
     sender: message.role === "assistant" ? "ai" : "user",
     text: message.content,
     sources: message.sources,
+    relatedCare: message.relatedCare,
+    feedback: message.feedback,
     timestamp: formatTime(new Date(message.createdAt)),
     persisted: true,
+    persistedId: message.id,
   };
 }
 
@@ -592,12 +707,37 @@ function isStreamMeta(value: unknown): value is StreamMeta {
     "sources" in value &&
     Array.isArray(value.sources) &&
     "isEmergency" in value &&
-    typeof value.isEmergency === "boolean",
+    typeof value.isEmergency === "boolean" &&
+    (!("relatedCare" in value) || value.relatedCare === undefined || isRelatedCareOptions(value.relatedCare)),
+  );
+}
+
+function isRelatedCareOptions(value: unknown): value is RelatedCareOptions {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "reason" in value &&
+    typeof value.reason === "string" &&
+    "disclaimer" in value &&
+    typeof value.disclaimer === "string" &&
+    "products" in value &&
+    Array.isArray(value.products) &&
+    "doctors" in value &&
+    Array.isArray(value.doctors),
   );
 }
 
 function isStreamToken(value: unknown): value is StreamToken {
   return Boolean(value && typeof value === "object" && "token" in value && typeof value.token === "string");
+}
+
+function isStreamCompletion(value: unknown): value is StreamCompletion {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "messageId" in value &&
+    typeof value.messageId === "string",
+  );
 }
 
 function isProviderBlocked(status: ProviderStatusView | null, now: number) {
@@ -607,18 +747,18 @@ function isProviderBlocked(status: ProviderStatusView | null, now: number) {
 }
 
 function providerPresentation(status: ProviderStatusView | null, now: number) {
-  if (!status) return { label: "Memeriksa provider AI...", dotClass: "animate-pulse bg-white/60" };
-  if (status.status === "READY") return { label: "Provider AI siap", dotClass: "bg-emerald-300" };
+  if (!status) return { label: "Memeriksa kesiapan layanan...", dotClass: "animate-pulse bg-white/60" };
+  if (status.status === "READY") return { label: "Asisten siap membantu", dotClass: "bg-emerald-300" };
   if (status.status === "NOT_CONFIGURED") {
-    return { label: "Provider AI belum dikonfigurasi", dotClass: "bg-red-300" };
+    return { label: "Layanan belum siap", dotClass: "bg-red-300" };
   }
 
   const seconds = status.retryAt ? Math.max(0, Math.ceil((status.retryAt - now) / 1_000)) : 0;
   const countdown = seconds > 0 ? ` · coba lagi ${formatCountdown(seconds)}` : "";
   if (status.status === "RATE_LIMITED") {
-    return { label: `Kuota provider AI sedang dibatasi${countdown}`, dotClass: "bg-amber-300" };
+    return { label: `Banyak pengguna sedang bertanya${countdown}`, dotClass: "bg-amber-300" };
   }
-  return { label: `Provider AI tidak tersedia${countdown}`, dotClass: "bg-red-300" };
+  return { label: `Asisten sedang tidak tersedia${countdown}`, dotClass: "bg-red-300" };
 }
 
 function updateProviderFromError(
@@ -637,7 +777,7 @@ function updateProviderFromError(
   if (!status) return;
 
   update((current) => ({
-    provider: "groq",
+    provider: "9router",
     model: current?.model ?? "",
     status,
     ...(retryAfterSeconds
@@ -665,7 +805,7 @@ function errorMessage(error: unknown) {
     return error.message;
   }
 
-  return "Chatbot tidak dapat dihubungi. Pastikan backend sedang berjalan.";
+  return "GlucoAssistant belum dapat dihubungi. Periksa koneksi internet, lalu coba lagi.";
 }
 
 function readRetryAfterSeconds(details: unknown) {

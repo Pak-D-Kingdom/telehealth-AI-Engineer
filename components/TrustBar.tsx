@@ -7,19 +7,19 @@ export default function TrustBar() {
   const items = [
     {
       icon: PackageCheck,
-      text: "OBAT & ALAT KIRIM KE RUMAH"
+      text: "KATALOG INFORMASI PRODUK"
     },
     {
       icon: Stethoscope,
-      text: "DOKTER SPESIALIS SP.PD RESMI"
+      text: "PROFIL TENAGA MEDIS"
     },
     {
       icon: Zap,
-      text: "100% KONSULTASI ONLINE"
+      text: "INFORMASI DARI SUMBER PILIHAN"
     },
     {
       icon: CircleDollarSign,
-      text: "HARGA TRANSPARAN & BIASA"
+      text: "PERSETUJUAN SEBELUM DATA DISIMPAN"
     }
   ];
 

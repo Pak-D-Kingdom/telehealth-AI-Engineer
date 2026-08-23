@@ -22,7 +22,7 @@ interface CartItem {
   qty: number;
 }
 
-const CART_KEY = "myskin_cart";
+const CART_KEY = "glucocare_cart";
 const CART_CHANGE_EVENT = "telehealth-cart-change";
 const DEFAULT_ITEMS: CartItem[] = [
   {
@@ -35,10 +35,10 @@ const DEFAULT_ITEMS: CartItem[] = [
   },
   {
     id: "p2",
-    name: "Metformin 500mg Release Control",
-    unit: "Obat Regulasional 30 Tab",
+    name: "Strip Tes Gula Darah",
+    unit: "Isi 50 Strip",
     price: 45000,
-    image: "/images/metformin.png",
+    image: "/images/glucometer.png",
     qty: 2,
   },
 ];
@@ -141,7 +141,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#132E21] font-sans antialiased selection:bg-[#E07A5F] selection:text-white">
       
-      {/* Header Bar with Official MySkin Logo */}
+      {/* GlucoCare demo checkout header */}
       <header className="bg-[#132E21] text-white border-b border-[#1E4431]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link
@@ -152,11 +152,11 @@ export default function CheckoutPage() {
             <span>Kembali ke Toko</span>
           </Link>
 
-          {/* Official MySkin Horizontal Logo */}
+          {/* GlucoCare horizontal logo */}
           <div className="relative w-36 h-10 sm:w-44 sm:h-12">
             <Image
               src="/images/logo_horizontal.png"
-              alt="MySkin Logo"
+              alt="GlucoCare Logo"
               fill
               className="object-contain"
               priority
@@ -165,7 +165,7 @@ export default function CheckoutPage() {
 
           <div className="hidden sm:flex items-center gap-2 text-xs text-[#B0C4B8] font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Pembayaran Aman</span>
+            <span>Simulasi Pemesanan</span>
           </div>
         </div>
       </header>
@@ -185,7 +185,7 @@ export default function CheckoutPage() {
               </h1>
             </div>
             <p className="text-xs sm:text-sm text-[#4A5D53]">
-              Lengkapi informasi tujuan pengiriman produk formulasi pilihanmu.
+              Halaman ini hanya mendemonstrasikan alur checkout dan tidak memproses transaksi nyata.
             </p>
           </div>
 
@@ -319,10 +319,10 @@ export default function CheckoutPage() {
                       <div className="space-y-3">
                         <div>
                           <span className="font-extrabold text-sm text-[#132E21] block">
-                            QRIS Instant (Semua M-Banking & E-Wallet)
+                            QRIS Langsung (Semua Aplikasi Bank dan Dompet Digital)
                           </span>
                           <span className="text-xs text-[#4A5D53] font-medium">
-                            Scan langsung tanpa perlu upload bukti transfer. Bebas biaya admin.
+                            Pindai langsung tanpa perlu mengunggah bukti transfer. Bebas biaya admin.
                           </span>
                         </div>
 
@@ -368,7 +368,7 @@ export default function CheckoutPage() {
                       <div className="space-y-3">
                         <div>
                           <span className="font-extrabold text-sm text-[#132E21] block">
-                            Virtual Account Bank
+                            Nomor Pembayaran Bank
                           </span>
                           <span className="text-xs text-[#4A5D53] font-medium">
                             Verifikasi otomatis 24 jam via m-banking / ATM.
@@ -427,10 +427,10 @@ export default function CheckoutPage() {
                       />
                       <div>
                         <span className="font-extrabold text-sm text-[#132E21] block">
-                          COD (Bayar di Tempat Saat Paket Tiba)
+                          Bayar di Tempat Saat Paket Tiba
                         </span>
                         <span className="text-xs text-[#4A5D53] font-medium">
-                          Bayar tunai secara aman langsung ke kurir ekspres saat paket diterima.
+                          Opsi simulasi pembayaran tunai saat paket diterima.
                         </span>
                       </div>
                     </div>
@@ -448,11 +448,11 @@ export default function CheckoutPage() {
                 
                 {/* Header logo in summary */}
                 <div className="flex items-center justify-between border-b border-[#F0ECE6] pb-4">
-                  <h3 className="text-base font-extrabold text-[#132E21]">Rincian Formulasi</h3>
+                  <h3 className="text-base font-extrabold text-[#132E21]">Rincian Simulasi</h3>
                   <div className="relative w-24 h-7">
                     <Image
                       src="/images/logo_horizontal.png"
-                      alt="MySkin"
+                      alt="GlucoCare"
                       fill
                       className="object-contain"
                     />
@@ -506,7 +506,7 @@ export default function CheckoutPage() {
                 {/* Calculation */}
                 <div className="space-y-3 pt-4 border-t border-[#F0ECE6] text-xs text-[#4A5D53]">
                   <div className="flex justify-between">
-                    <span>Subtotal Produk</span>
+                    <span>Jumlah Harga Produk</span>
                     <span className="font-bold text-[#132E21]">{formatRupiah(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -562,7 +562,7 @@ export default function CheckoutPage() {
           <div className="relative w-44 h-12 mx-auto">
             <Image
               src="/images/logo_horizontal.png"
-              alt="MySkin Logo"
+              alt="GlucoCare Logo"
               fill
               className="object-contain"
             />
@@ -574,10 +574,10 @@ export default function CheckoutPage() {
 
           <div className="space-y-2">
             <h1 className="text-3xl font-extrabold text-[#132E21]">
-              Pembayaran Berhasil!
+              Simulasi Pesanan Berhasil
             </h1>
             <p className="text-sm text-[#4A5D53] max-w-md mx-auto">
-              Pesanan formulasi <strong className="text-[#132E21]">#MSK-894210</strong> telah dikonfirmasi. Tim farmasi kami sedang mengemas pesananmu.
+              Alur demo <strong className="text-[#132E21]">#GLC-DEMO-894210</strong> selesai. Tidak ada pembayaran atau pesanan nyata yang dibuat.
             </p>
           </div>
 
@@ -614,7 +614,7 @@ export default function CheckoutPage() {
           <div className="relative w-44 h-12 mx-auto">
             <Image
               src="/images/logo_horizontal.png"
-              alt="MySkin Logo"
+              alt="GlucoCare Logo"
               fill
               className="object-contain"
             />
@@ -629,7 +629,7 @@ export default function CheckoutPage() {
               Pembayaran Belum Berhasil
             </h1>
             <p className="text-sm text-[#4A5D53] max-w-md mx-auto">
-              Waktu sesi pembayaran QRIS atau otorisasi m-banking kamu telah kadaluarsa. Saldo kamu belum terpotong.
+              Simulasi pembayaran dihentikan. Tidak ada transaksi atau perubahan saldo nyata.
             </p>
           </div>
 
