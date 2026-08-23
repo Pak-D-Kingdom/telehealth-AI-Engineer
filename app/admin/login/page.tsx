@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
       setError(
         loginError instanceof ApiError
           ? loginError.message
-          : "Tidak dapat memproses login saat ini.",
+          : "Belum dapat masuk saat ini. Silakan coba lagi.",
       );
       setIsSubmitting(false);
     }
@@ -47,7 +47,7 @@ export default function AdminLoginPage() {
             />
           </div>
           <p className="text-xs font-semibold text-[#88D39E]">
-            Admin Dashboard
+            Halaman Pengelola
           </p>
         </div>
 
@@ -106,7 +106,7 @@ export default function AdminLoginPage() {
         </form>
 
         <p className="text-center text-xs text-[#88D39E]/80">
-          Gunakan akun admin yang dikonfigurasi pada backend.
+          Gunakan akun pengelola yang telah disiapkan.
         </p>
       </div>
     </div>
