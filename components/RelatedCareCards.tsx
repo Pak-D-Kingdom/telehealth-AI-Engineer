@@ -5,6 +5,7 @@ import {
   MessageCircle,
   ShoppingCart,
   Stethoscope,
+  CalendarClock,
 } from "lucide-react";
 import type {
   RelatedCareDoctor,
@@ -19,6 +20,7 @@ interface RelatedCareCardsProps {
   onViewProduct?: (product: RelatedCareProduct) => void;
   onBuyProduct?: (product: RelatedCareProduct) => void;
   onViewDoctor?: (doctor: RelatedCareDoctor) => void;
+  onBookDoctor?: (doctor: RelatedCareDoctor) => void;
   disabled?: boolean;
   showSuggestions?: boolean;
 }
@@ -29,6 +31,7 @@ export default function RelatedCareCards({
   onViewProduct,
   onBuyProduct,
   onViewDoctor,
+  onBookDoctor,
   disabled = false,
   showSuggestions = false,
 }: RelatedCareCardsProps) {
@@ -131,6 +134,12 @@ export default function RelatedCareCards({
                 <p className="mt-1 flex items-center gap-1 text-[10px] text-[#6B7C72]">
                   <Stethoscope className="h-3 w-3" /> {doctor.experience}
                 </p>
+                {doctor.nextAvailability && (
+                  <p className="mt-1.5 flex items-start gap-1 text-[10px] font-semibold leading-snug text-[#0D5C46]">
+                    <CalendarClock className="mt-0.5 h-3 w-3 shrink-0" />
+                    Tersedia {new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(doctor.nextAvailability.startsAt))} WIB
+                  </p>
+                )}
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {onViewDoctor && (
                     <ActionButton
@@ -140,11 +149,20 @@ export default function RelatedCareCards({
                       disabled={disabled}
                     />
                   )}
-                  {onSelect && (
+                  {onSelect && !onBookDoctor && (
                     <ActionButton
                       label="Mulai konsultasi"
                       icon={<MessageCircle className="h-3 w-3" />}
                       onClick={() => onSelect(`Saya ingin memulai konsultasi dengan ${doctor.name}.`)}
+                      disabled={disabled}
+                      primary
+                    />
+                  )}
+                  {onBookDoctor && (
+                    <ActionButton
+                      label={doctor.nextAvailability ? "Pilih jadwal" : "Cek jadwal"}
+                      icon={<CalendarClock className="h-3 w-3" />}
+                      onClick={() => onBookDoctor(doctor)}
                       disabled={disabled}
                       primary
                     />

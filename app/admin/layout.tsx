@@ -11,6 +11,7 @@ import {
   Stethoscope,
   LogOut,
   MessageSquareText,
+  CalendarDays,
   Menu,
   X,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Ringkasan", icon: LayoutDashboard },
   { href: "/admin/produk", label: "Produk & Alat", icon: Package },
   { href: "/admin/dokter", label: "Dokter Spesialis", icon: Stethoscope },
+  { href: "/admin/booking", label: "Jadwal & Booking", icon: CalendarDays },
   { href: "/admin/chat", label: "Percakapan & Data Pasien", icon: MessageSquareText },
 ];
 

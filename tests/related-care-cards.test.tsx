@@ -26,6 +26,14 @@ describe("RelatedCareCards", () => {
           specialty: "Diabetes Tipe 2",
           experience: "10 Tahun",
           image: null,
+          nextAvailability: {
+            slotId: "00000000-0000-4000-8000-000000000004",
+            mode: "ONLINE",
+            startsAt: "2026-08-30T03:00:00.000Z",
+            endsAt: "2026-08-30T03:45:00.000Z",
+            price: 250_000,
+            clinic: null,
+          },
         }],
         suggestedReplies: [{
           id: "type-2",
@@ -37,6 +45,7 @@ describe("RelatedCareCards", () => {
       onViewProduct: () => undefined,
       onBuyProduct: () => undefined,
       onViewDoctor: () => undefined,
+      onBookDoctor: () => undefined,
       showSuggestions: true,
     }));
 
@@ -48,7 +57,8 @@ describe("RelatedCareCards", () => {
     expect(html).toContain("Konsultasi resep");
     expect(html).not.toContain("Beli produk");
     expect(html).toContain("Lihat profil");
-    expect(html).toContain("Mulai konsultasi");
+    expect(html).toContain("Pilih jadwal");
+    expect(html).toContain("Tersedia");
     expect(html).toContain("Diabetes tipe 2");
   });
 
