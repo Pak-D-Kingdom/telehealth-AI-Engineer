@@ -41,6 +41,30 @@ enum LeadQualificationStatus {
   NOT_ELIGIBLE
 }
 
+enum ConsultationMode {
+  ONLINE
+  OFFLINE
+}
+
+enum ScheduleSlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingActorType {
+  PATIENT
+  ADMIN
+  SYSTEM
+}
+
 model User {
   id           String        @id @default(uuid()) @db.Uuid
   email        String        @unique @db.VarChar(255)
@@ -96,6 +120,8 @@ model Doctor {
   image              String?                    @db.VarChar(500)
   isActive           Boolean                    @default(true) @map("is_active")
   categories         DoctorCategoryAssignment[]
+  scheduleSlots      DoctorScheduleSlot[]
+  bookings           ConsultationBooking[]
   createdAt          DateTime                   @default(now()) @map("created_at")
   updatedAt          DateTime                   @updatedAt @map("updated_at")
 
@@ -125,19 +151,104 @@ model DoctorCategoryAssignment {
   @@map("doctor_category_assignments")
 }
 
+model Clinic {
+  id        String               @id @default(uuid()) @db.Uuid
+  slug      String               @unique @db.VarChar(160)
+  name      String               @db.VarChar(180)
+  city      String               @db.VarChar(120)
+  address   String
+  whatsapp  String?              @db.VarChar(40)
+  isActive  Boolean              @default(true) @map("is_active")
+  slots     DoctorScheduleSlot[]
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  @@index([city])
+  @@index([isActive])
+  @@map("clinics")
+}
+
+model DoctorScheduleSlot {
+  id        String                @id @default(uuid()) @db.Uuid
+  doctorId  String                @map("doctor_id") @db.Uuid
+  clinicId  String?               @map("clinic_id") @db.Uuid
+  mode      ConsultationMode
+  startsAt  DateTime              @map("starts_at")
+  endsAt    DateTime              @map("ends_at")
+  price     Int
+  status    ScheduleSlotStatus    @default(AVAILABLE)
+  notes     String?               @db.VarChar(300)
+  doctor    Doctor                @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  clinic    Clinic?               @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  bookings  ConsultationBooking[]
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
+
+  @@unique([doctorId, startsAt])
+  @@index([status, startsAt])
+  @@index([clinicId])
+  @@map("doctor_schedule_slots")
+}
+
+model ConsultationBooking {
+  id                     String             @id @default(uuid()) @db.Uuid
+  bookingCode            String             @unique @map("booking_code") @db.VarChar(32)
+  sessionId              String?            @map("session_id") @db.Uuid
+  doctorId               String             @map("doctor_id") @db.Uuid
+  slotId                 String             @map("slot_id") @db.Uuid
+  patientName            String             @map("patient_name") @db.VarChar(160)
+  whatsapp               String             @db.VarChar(40)
+  complaint              String?            @db.VarChar(1000)
+  preConsultationSummary Json?              @map("pre_consultation_summary") @db.JsonB
+  status                 BookingStatus      @default(PENDING)
+  consentAt              DateTime           @map("consent_at")
+  deletionRequestedAt    DateTime?          @map("deletion_requested_at")
+  anonymizedAt           DateTime?          @map("anonymized_at")
+  session                ChatSession?       @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  doctor                 Doctor             @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  slot                   DoctorScheduleSlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  events                 BookingEvent[]
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+
+  @@index([slotId, status])
+  @@index([doctorId, createdAt])
+  @@index([sessionId])
+  @@index([status, createdAt])
+  @@index([deletionRequestedAt])
+  @@map("consultation_bookings")
+}
+
+model BookingEvent {
+  id             String              @id @default(uuid()) @db.Uuid
+  bookingId      String              @map("booking_id") @db.Uuid
+  actorType      BookingActorType    @map("actor_type")
+  actorLabel     String?             @map("actor_label") @db.VarChar(160)
+  action         String              @db.VarChar(80)
+  previousStatus BookingStatus?      @map("previous_status")
+  newStatus      BookingStatus?      @map("new_status")
+  details        Json?               @db.JsonB
+  booking        ConsultationBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@index([bookingId, createdAt])
+  @@map("booking_events")
+}
+
 model ChatSession {
-  id           String            @id @default(uuid()) @db.Uuid
-  tokenHash    String            @unique @map("token_hash") @db.Char(64)
-  status       ChatSessionStatus @default(ACTIVE)
-  leadCaptured Boolean           @default(false) @map("lead_captured")
-  isEmergency  Boolean           @default(false) @map("is_emergency")
-  consentAt    DateTime?         @map("consent_at")
-  consentVersion String?         @map("consent_version") @db.VarChar(40)
-  expiresAt    DateTime          @map("expires_at")
-  messages     ChatMessage[]
-  lead         ChatLead?
-  createdAt    DateTime          @default(now()) @map("created_at")
-  updatedAt    DateTime          @updatedAt @map("updated_at")
+  id             String                @id @default(uuid()) @db.Uuid
+  tokenHash      String                @unique @map("token_hash") @db.Char(64)
+  status         ChatSessionStatus     @default(ACTIVE)
+  leadCaptured   Boolean               @default(false) @map("lead_captured")
+  isEmergency    Boolean               @default(false) @map("is_emergency")
+  consentAt      DateTime?             @map("consent_at")
+  consentVersion String?               @map("consent_version") @db.VarChar(40)
+  expiresAt      DateTime              @map("expires_at")
+  messages       ChatMessage[]
+  lead           ChatLead?
+  bookings       ConsultationBooking[]
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
 
   @@index([expiresAt])
   @@index([status])
@@ -171,14 +282,14 @@ model ChatMessage {
 }
 
 model ChatMessageFeedback {
-  id        String             @id @default(uuid()) @db.Uuid
-  messageId String             @unique @map("message_id") @db.Uuid
+  id        String              @id @default(uuid()) @db.Uuid
+  messageId String              @unique @map("message_id") @db.Uuid
   rating    ChatFeedbackRating
   reason    ChatFeedbackReason?
-  comment   String?            @db.VarChar(500)
-  message   ChatMessage        @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
+  comment   String?             @db.VarChar(500)
+  message   ChatMessage         @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
 
   @@index([rating])
   @@index([reason])
@@ -202,13 +313,13 @@ model ChatLead {
 }
 
 model KnowledgeBase {
-  id        String                @id @default(uuid()) @db.Uuid
-  title     String                @db.VarChar(240)
+  id        String                      @id @default(uuid()) @db.Uuid
+  title     String                      @db.VarChar(240)
   content   String
   embedding Unsupported("vector(3072)")
-  source    String                @unique @db.VarChar(240)
-  createdAt DateTime              @default(now()) @map("created_at")
-  updatedAt DateTime              @updatedAt @map("updated_at")
+  source    String                      @unique @db.VarChar(240)
+  createdAt DateTime                    @default(now()) @map("created_at")
+  updatedAt DateTime                    @updatedAt @map("updated_at")
 
   @@map("knowledge_base")
 }

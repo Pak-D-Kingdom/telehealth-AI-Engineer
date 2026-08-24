@@ -58,6 +58,17 @@ export interface RelatedCareDoctor {
   specialty: string;
   experience: string;
   image: string | null;
+  nextAvailability?: {
+    slotId: string;
+    mode: "ONLINE" | "OFFLINE";
+    startsAt: string;
+    endsAt: string;
+    price: number;
+    clinic: {
+      name: string;
+      city: string;
+    } | null;
+  };
 }
 
 export interface SuggestedReply {

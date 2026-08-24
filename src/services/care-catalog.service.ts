@@ -118,6 +118,17 @@ const relatedCareSchema = z.object({
     specialty: z.string(),
     experience: z.string(),
     image: z.string().nullable(),
+    nextAvailability: z.object({
+      slotId: z.string().uuid(),
+      mode: z.enum(["ONLINE", "OFFLINE"]),
+      startsAt: z.string().datetime(),
+      endsAt: z.string().datetime(),
+      price: z.number().int().nonnegative(),
+      clinic: z.object({
+        name: z.string(),
+        city: z.string(),
+      }).nullable(),
+    }).optional(),
   })),
   suggestedReplies: z.array(z.object({
     id: z.string(),
@@ -177,6 +188,26 @@ export async function findRelatedCareOptions(
         experience: true,
         image: true,
         categories: { select: { categoryId: true } },
+        scheduleSlots: {
+          where: {
+            status: "AVAILABLE",
+            startsAt: { gt: new Date() },
+            OR: [
+              { mode: "ONLINE" },
+              { mode: "OFFLINE", clinic: { isActive: true } },
+            ],
+          },
+          select: {
+            id: true,
+            mode: true,
+            startsAt: true,
+            endsAt: true,
+            price: true,
+            clinic: { select: { name: true, city: true } },
+          },
+          orderBy: { startsAt: "asc" },
+          take: 1,
+        },
       },
       take: 20,
     }),
@@ -229,6 +260,18 @@ export async function findRelatedCareOptions(
       specialty: doctor.specialty,
       experience: doctor.experience,
       image: doctor.image,
+      ...(doctor.scheduleSlots[0]
+        ? {
+            nextAvailability: {
+              slotId: doctor.scheduleSlots[0].id,
+              mode: doctor.scheduleSlots[0].mode,
+              startsAt: doctor.scheduleSlots[0].startsAt.toISOString(),
+              endsAt: doctor.scheduleSlots[0].endsAt.toISOString(),
+              price: doctor.scheduleSlots[0].price,
+              clinic: doctor.scheduleSlots[0].clinic,
+            },
+          }
+        : {}),
     }));
 
   if (rankedProducts.length === 0 && rankedDoctors.length === 0) return undefined;

@@ -18,6 +18,8 @@
     "db:deploy": "bunx --bun prisma migrate deploy",
     "db:seed": "bunx --bun prisma db seed",
     "db:seed:knowledge": "bun scripts/seed-knowledge.ts",
+    "db:cleanup:bookings": "bun scripts/cleanup-bookings.ts",
+    "db:cleanup:bookings:dry-run": "bun scripts/cleanup-bookings.ts --dry-run",
     "db:studio": "bunx --bun prisma studio",
     "postinstall": "bunx --bun prisma generate",
     "test": "NODE_ENV=test bun test",

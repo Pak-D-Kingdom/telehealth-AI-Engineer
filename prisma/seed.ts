@@ -290,6 +290,36 @@ const doctors = [
   },
 ];
 
+const clinics = [
+  {
+    slug: "glucocare-jakarta-demo",
+    name: "Klinik GlucoCare Jakarta (Demo)",
+    city: "Jakarta Selatan",
+    address: "Jl. Kesehatan No. 18, Kebayoran Baru, Jakarta Selatan",
+    whatsapp: null,
+    isActive: true,
+  },
+  {
+    slug: "glucocare-bandung-demo",
+    name: "Klinik GlucoCare Bandung (Demo)",
+    city: "Bandung",
+    address: "Jl. Sehat Bersama No. 27, Sukajadi, Bandung",
+    whatsapp: null,
+    isActive: true,
+  },
+];
+
+function futureJakartaDate(daysFromNow: number, hour: number, minute = 0) {
+  const target = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1_000);
+  const jakartaDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(target);
+  return new Date(`${jakartaDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00+07:00`);
+}
+
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -349,7 +379,55 @@ async function main() {
     });
   }
 
-  console.log("Seed admin, produk, dokter, dan kategori berhasil.");
+  const seededClinics = new Map<string, string>();
+  for (const clinicData of clinics) {
+    const clinic = await prisma.clinic.upsert({
+      where: { slug: clinicData.slug },
+      update: clinicData,
+      create: clinicData,
+    });
+    seededClinics.set(clinic.slug, clinic.id);
+  }
+
+  const seededDoctors = await prisma.doctor.findMany({
+    where: { slug: { in: doctors.slice(0, 6).map((doctor) => doctor.slug) } },
+    orderBy: { slug: "asc" },
+  });
+  const jakartaClinicId = seededClinics.get("glucocare-jakarta-demo");
+  const bandungClinicId = seededClinics.get("glucocare-bandung-demo");
+
+  for (const [doctorIndex, doctor] of seededDoctors.entries()) {
+    for (let dayOffset = 1; dayOffset <= 7; dayOffset += 2) {
+      const mode = (doctorIndex + dayOffset) % 2 === 0 ? "ONLINE" : "OFFLINE";
+      const startsAt = futureJakartaDate(dayOffset, 9 + (doctorIndex % 4), doctorIndex % 2 ? 30 : 0);
+      const endsAt = new Date(startsAt.getTime() + 45 * 60 * 1_000);
+      const clinicId = mode === "OFFLINE"
+        ? doctorIndex % 2 === 0 ? jakartaClinicId : bandungClinicId
+        : null;
+
+      await prisma.doctorScheduleSlot.upsert({
+        where: { doctorId_startsAt: { doctorId: doctor.id, startsAt } },
+        update: {
+          endsAt,
+          mode,
+          clinicId,
+          price: 225_000 + doctorIndex * 25_000,
+          notes: "Jadwal konsultasi demonstrasi",
+        },
+        create: {
+          doctorId: doctor.id,
+          clinicId,
+          mode,
+          startsAt,
+          endsAt,
+          price: 225_000 + doctorIndex * 25_000,
+          notes: "Jadwal konsultasi demonstrasi",
+        },
+      });
+    }
+  }
+
+  console.log("Seed admin, produk, dokter, klinik, dan jadwal konsultasi berhasil.");
 }
 
 main()
