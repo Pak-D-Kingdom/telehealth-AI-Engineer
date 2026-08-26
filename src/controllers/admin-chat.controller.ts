@@ -5,6 +5,7 @@ import {
   updateAdminChatSchema,
 } from "../validators/admin-chat.validator";
 import {
+  deleteAdminChatSession,
   getAdminChatSession,
   getAdminChatStats,
   listAdminChatSessions,
@@ -33,4 +34,10 @@ export const update: RequestHandler = async (req, res) => {
   const input = updateAdminChatSchema.parse(req.body);
   const data = await updateAdminChatSession(id, input);
   res.status(200).json({ data });
+};
+
+export const remove: RequestHandler = async (req, res) => {
+  const { id } = uuidParamsSchema.parse(req.params);
+  await deleteAdminChatSession(id);
+  res.status(204).send();
 };

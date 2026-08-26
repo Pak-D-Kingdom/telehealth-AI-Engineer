@@ -125,6 +125,24 @@ export async function updateAdminChatSession(id: string, input: AdminChatUpdate)
   return getAdminChatSession(id);
 }
 
+export async function deleteAdminChatSession(id: string) {
+  const exists = await prisma.chatSession.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!exists) {
+    throw new AppError(404, "CHAT_SESSION_NOT_FOUND", "Session chat tidak ditemukan.");
+  }
+
+  await prisma.$transaction([
+    prisma.chatMessage.deleteMany({ where: { sessionId: id } }),
+    prisma.chatLead.deleteMany({ where: { sessionId: id } }),
+    prisma.chatSession.delete({ where: { id } }),
+  ]);
+
+  return { success: true };
+}
+
 function buildWhere(query: AdminChatListQuery): Prisma.ChatSessionWhereInput {
   return {
     ...(query.status ? { status: query.status } : {}),

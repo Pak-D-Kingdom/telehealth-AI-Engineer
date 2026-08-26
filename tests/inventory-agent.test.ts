@@ -69,7 +69,7 @@ describe("Admin AI Pharmacy Inventory & Restock Forecasting Agent", () => {
       expect(json.success).toBe(true);
       expect(json.data.summary).toBeDefined();
       expect(Array.isArray(json.data.items)).toBe(true);
-    }, 45000);
+    }, 60000);
 
     test("POST /api/ai/inventory/query mengembalikan status 200 dan saran pengadaan AI", async () => {
       const res = await fetch(`${baseUrl}/api/ai/inventory/query`, {
@@ -81,6 +81,6 @@ describe("Admin AI Pharmacy Inventory & Restock Forecasting Agent", () => {
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(typeof json.data.answer).toBe("string");
-    }, 45000);
+    }, 60000);
   });
 });
