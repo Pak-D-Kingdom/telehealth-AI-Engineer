@@ -17,7 +17,7 @@ export default function SkinIssues({ onOpenChat }: SkinIssuesProps) {
       description: "Gejala badan sering lemas, gampang haus, dan kencing terus-menerus di malam hari. Butuh kontrol gula darah teratur.",
       ingredients: "Metformin 500mg + Diet Low-GI",
       image: "/images/issue_high_sugar.png",
-      query: "Gue mau konsul keluhan kadar gula darah tinggi dan sering haus."
+      query: "Saya ingin berkonsultasi mengenai keluhan kadar gula darah tinggi dan sering haus."
     },
     {
       id: "hba1c",
@@ -35,7 +35,7 @@ export default function SkinIssues({ onOpenChat }: SkinIssuesProps) {
       description: "Perawatan khusus luka di area kaki agar jaringan kulit cepat beregenerasi dan tidak memicu infeksi jaringan.",
       ingredients: "Gel Salep Anti-Bakteri Ulkus Diabetes",
       image: "/images/issue_ulcer.png",
-      query: "Luka di kaki gue basah dan lambat sembuh karena diabetes, mohon rekomendasi penanganan."
+      query: "Luka di kaki saya basah dan lambat sembuh karena diabetes, mohon rekomendasi penanganan."
     },
     {
       id: "diet",
@@ -44,7 +44,7 @@ export default function SkinIssues({ onOpenChat }: SkinIssuesProps) {
       description: "Saran makanan sehat harian agar lonjakan kadar gula darah pasca makan tetap terkontrol secara alami.",
       ingredients: "Serat Herbal Jamu Kayu Manis",
       image: "/images/issue_diet.png",
-      query: "Tolong kasih panduan diet diabetes dan pilihan makanan berindeks glikemik rendah."
+      query: "Tolong berikan panduan diet diabetes dan pilihan makanan berindeks glikemik rendah."
     }
   ];
 

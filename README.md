@@ -1,6 +1,6 @@
 # Telehealth Frontend
 
-Frontend GlucoCare menggunakan Next.js, React, TypeScript, Tailwind CSS, dan Bun. Aplikasi mengambil katalog, data dokter, autentikasi admin, dan layanan chatbot dari `telehealth-backend`.
+Frontend GlucoCare menggunakan Next.js, React, TypeScript, Tailwind CSS, dan Bun. Aplikasi mengambil katalog, data dokter, autentikasi admin, layanan konsultasi & booking, serta ekosistem AI terintegrasi dari `telehealth-backend`.
 
 ## Prasyarat
 
@@ -51,7 +51,7 @@ docker compose version
    bun run dev
    ```
 
-   Chatbot membutuhkan `GROQ_API_KEY` dan `GEMINI_API_KEY` baru pada `.env` backend. Setelah keduanya diisi, jalankan `bun run db:seed:knowledge` sebelum memakai fitur RAG.
+   Chatbot mendukung multi-key rotation (Groq key 1..N), fallback OpenRouter, dan gateway 9Router pada `.env` backend. Setelah dikonfigurasi, jalankan `bun run db:seed:knowledge` sebelum memakai fitur RAG.
 
 5. Kembali ke frontend dan jalankan development server:
 
@@ -68,32 +68,28 @@ Frontend ini mengintegrasikan seluruh ekosistem AI terdistribusi dari backend:
 
 ### 1. Fitur AI untuk Pasien & Pengguna Publik (Public Tools)
 - **AI Diabetes Daily Meal & Carb Planner (`/`)**: Generator rencana menu makan 1 hari ramah gula darah (target kalori, gram karbohidrat, urutan makan, dan teaser paket langganan GlucoCare Pro).
-- **Multimodal AI Food Vision (`ChatBot.tsx`)**: Analisis visual foto makanan dan komparasi 2 menu makanan secara langsung di chatbot.
-- **RAG Conversational Health Chatbot (`ChatBot.tsx`)**: Konsultasi diabetes 24/7 berbasis referensi terverifikasi dengan guardrails medis.
+- **Multimodal AI Food Vision (`ChatBot.tsx`)**: Analisis visual foto makanan dan komparasi menu makanan secara langsung di chatbot.
+- **RAG Conversational Health Chatbot (`ChatBot.tsx`)**: Konsultasi diabetes 24/7 dengan streaming SSE, markdown rendering, feedback rating, dan guardrails darurat.
+- **Jadwal & Booking Dokter Spesialis (`components/DoctorBookingPanel.tsx`)**: Pemilihan jadwal slot online/offline langsung dari chatbot atau landing page.
 
 ### 2. Fitur AI untuk Admin & Manajemen Telehealth (Admin Portal)
 - **AI Finance & Revenue Intelligence (`/admin`)**: Analisis valuasi katalog produk, proyeksi omset pipeline, dan asisten finansial interaktif.
 - **AI Lead Scoring CRM & WhatsApp Outreach (`/admin/chat`)**: Skor prospek (0–100), klasifikasi tier (`HOT/WARM/COLD`), dan tautan WhatsApp 1-Klik.
 - **AI Pharmacy Inventory & Restock Forecasting (`/admin/produk`)**: Pemantauan stok fisik, peramalan sisa hari stok (Runout Days), dan rekomendasi pesanan ulang (EOQ).
-- **Clean Markdown & Table Parser (`FormattedMarkdown.tsx`)**: Rendering tipografi bersih tanpa simbol mentah dan tabel data responsif.
+- **Modern Confirmation Modals**: Dialog pop-up elegan untuk konfirmasi penghapusan sesi chat admin dan reset percakapan publik.
 
 ## Integrasi Backend
 
 Frontend menggunakan API berikut:
 
 - katalog publik: `/api/products`, `/api/doctors`, dan `/api/doctor-categories`
-- perencana makan AI gratis: `POST /api/ai/meal-plan/generate`
+- perencana makan AI: `POST /api/ai/meal-plan/generate`
 - autentikasi admin: `/api/auth/login`, `/api/auth/me`, dan `/api/auth/logout`
 - dashboard admin: `/api/admin/products`, `/api/admin/doctors`, serta endpoint CRUD produk dan dokter
 - intelligence AI admin: `/api/ai/finance/insights`, `/api/ai/finance/query`, `/api/ai/leads/batch-scores`, `/api/ai/inventory/forecast`, `/api/ai/inventory/query`
 - dashboard chat/lead: `/api/admin/chat/stats` dan `/api/admin/chat/sessions`
-- chatbot: `POST /api/chat`, `GET /api/chat`, dan `DELETE /api/chat`
-
-Request autentikasi admin dan chatbot memakai cookie HTTP-only serta `credentials: "include"`. Karena itu, nilai `FRONTEND_URL` pada backend harus sama dengan origin frontend, secara default `http://localhost:3000`.
-
-Widget chat memulihkan histori dari backend ketika dibuka, mengirim pesan langsung ke API, dan menampilkan respons darurat yang ditandai backend. Tidak ada lagi respons medis berbasis kata kunci atau data percakapan palsu di frontend.
-
-Admin dapat membuka `/admin/chat` untuk mencari session, memfilter emergency/lead/status, membaca histori, menyelesaikan session, dan memberikan status kualifikasi lead.
+- chatbot: `POST /api/chat`, `POST /api/chat/stream`, `GET /api/chat`, dan `DELETE /api/chat`
+- jadwal & booking: `/api/consultations/doctors/:doctorId/schedule`, `/api/consultations/bookings`, `/api/admin/consultations/stats`
 
 ## Pemeriksaan Kode
 

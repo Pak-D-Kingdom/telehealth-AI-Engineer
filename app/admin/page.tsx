@@ -63,7 +63,7 @@ export default function AdminDashboard() {
       color: "bg-[#0D5C46]/10 text-[#0D5C46]",
     },
     {
-      label: "Lead Chatbot Lengkap",
+      label: "Data Pasien / Lead Chatbot",
       value: chatStatsResponse?.data.captured ?? 0,
       icon: MessageSquareText,
       href: "/admin/chat",
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
           Dashboard Manajemen & AI Intelligence
         </h1>
         <p className="text-sm text-[#6B7C72] mt-1">
-          Ringkasan operasional, produk, dokter, dan analisis finansial cerdas GlucoCare
+          Ringkasan operasional, produk, dokter, jadwal konsultasi, dan analisis finansial cerdas GlucoCare
         </p>
       </div>
 

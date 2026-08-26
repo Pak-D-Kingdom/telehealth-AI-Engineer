@@ -101,7 +101,7 @@ export default function HowItWorks({ onOpenChat }: HowItWorksProps) {
 
               <div className="pt-2">
                 <button
-                  onClick={() => onOpenChat("Gue mau konsultasi keluhan kadar gula darah sekarang.")}
+                  onClick={() => onOpenChat("Saya ingin berkonsultasi tentang keluhan kadar gula darah sekarang.")}
                   className="inline-flex items-center justify-center bg-[#E07A5F] hover:bg-[#C9664B] text-white px-9 py-4 rounded-full font-bold text-sm sm:text-base transition-all shadow-md hover:shadow-lg active:scale-95 uppercase tracking-wider cursor-pointer"
                 >
                   Mulai Konsultasi Diabetes Sekarang

@@ -67,10 +67,11 @@ export default function ProductsShowcase({ onOpenChat }: ProductsShowcaseProps) 
               <button
                 type="button"
                 key={product.id}
+                id={`product-${product.slug}`}
                 onClick={() =>
                   onOpenChat(`Saya ingin berkonsultasi mengenai ${product.name}.`)
                 }
-                className="group flex flex-col space-y-5 cursor-pointer text-left"
+                className="group flex scroll-mt-24 flex-col space-y-5 cursor-pointer text-left"
               >
                 <div className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden bg-[#F2EBE1] border border-[#E8DFC0]/40">
                   <Image

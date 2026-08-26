@@ -106,7 +106,6 @@ export default function AdminProdukPage() {
       const match = product.specs.match(/(?:stok|stock|qty|jumlah)\s*[:=]\s*(\d+)/i);
       if (match && match[1]) {
         stockVal = match[1];
-        // Clean out stock prefix from specs field for friendly editing
         pureSpecs = product.specs
           .replace(/(?:stok|stock|qty|jumlah)\s*[:=]\s*\d+\s*(?:unit|pcs|kotak|strip|botol)?\s*\|\s*/i, "")
           .replace(/\|\s*(?:stok|stock|qty|jumlah)\s*[:=]\s*\d+\s*(?:unit|pcs|kotak|strip|botol)?/i, "")

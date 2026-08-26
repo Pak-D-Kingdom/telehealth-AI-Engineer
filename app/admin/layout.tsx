@@ -11,15 +11,17 @@ import {
   Stethoscope,
   LogOut,
   MessageSquareText,
+  CalendarDays,
   Menu,
   X,
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin", label: "Dashboard AI & Stats", icon: LayoutDashboard },
   { href: "/admin/produk", label: "Produk & Alat", icon: Package },
   { href: "/admin/dokter", label: "Dokter Spesialis", icon: Stethoscope },
-  { href: "/admin/chat", label: "Chat & Lead", icon: MessageSquareText },
+  { href: "/admin/booking", label: "Jadwal & Booking", icon: CalendarDays },
+  { href: "/admin/chat", label: "Chat & Lead CRM", icon: MessageSquareText },
 ];
 
 function AdminShell({ children }: { children: React.ReactNode }) {
@@ -61,7 +63,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar — Desktop */}
       <aside className="hidden lg:flex flex-col w-60 bg-[#0D5C46] text-white shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <span className="text-sm font-extrabold tracking-tight">GlucoCare Admin</span>
+          <span className="text-sm font-extrabold tracking-tight">GlucoCare Admin AI</span>
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1">
@@ -104,7 +106,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
           />
           <aside className="relative flex flex-col w-64 bg-[#0D5C46] text-white z-10">
             <div className="h-16 flex items-center justify-between px-6 border-b border-white/10">
-              <span className="text-sm font-extrabold tracking-tight">GlucoCare Admin</span>
+              <span className="text-sm font-extrabold tracking-tight">GlucoCare Admin AI</span>
               <button onClick={() => setSidebarOpen(false)} className="text-white/60 hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>

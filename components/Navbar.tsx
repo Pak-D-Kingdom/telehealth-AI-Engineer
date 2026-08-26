@@ -102,12 +102,12 @@ export default function Navbar({ onOpenChat }: NavbarProps) {
           <button
             onClick={() => {
               setIsMobileMenuOpen(false);
-              onOpenChat("Halo, gue mau konsultasi masalah kadar gula darah.");
+              onOpenChat("Halo, saya ingin bertanya tentang masalah gula darah.");
             }}
             className="hidden sm:flex items-center gap-2 bg-[#E07A5F] hover:bg-[#C9664B] text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
             <MessageSquare className="w-4 h-4" />
-            <span>Konsul Diabetes</span>
+            <span>Konsul Diabetes AI</span>
           </button>
 
           {/* Aesthetic Frameless Mobile Hamburger Button */}
@@ -186,7 +186,7 @@ export default function Navbar({ onOpenChat }: NavbarProps) {
           <button
             onClick={() => {
               setIsMobileMenuOpen(false);
-              onOpenChat("Halo, gue mau konsultasi masalah kadar gula darah.");
+              onOpenChat("Halo, saya ingin bertanya tentang masalah gula darah.");
             }}
             className="w-full flex items-center justify-center gap-2 bg-[#E07A5F] hover:bg-[#C9664B] text-white py-3 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer mt-2"
           >

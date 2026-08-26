@@ -110,7 +110,7 @@ export async function streamApiRequest(
   }
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => undefined) as ErrorBody | undefined;
+    const payload = (await response.json().catch(() => undefined)) as ErrorBody | undefined;
     throw new ApiError(
       response.status,
       payload?.error?.code ?? "API_ERROR",

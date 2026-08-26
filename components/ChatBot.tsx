@@ -1,47 +1,53 @@
 "use client";
 
-import React, { useCallback, useState, useEffect, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  X,
+  AlertTriangle,
+  BookOpen,
+  CalendarSearch,
+  Camera,
+  MessageSquarePlus,
+  RefreshCw,
+  RotateCcw,
   Send,
   ShoppingCart,
   Stethoscope,
   Syringe,
-  ChevronRight,
-  ArrowRight,
-  Camera,
   Utensils,
-  Trash2,
-  Scale,
-  MessageCircle,
-  RotateCcw,
+  X,
 } from "lucide-react";
-import FormattedMarkdown from "./FormattedMarkdown";
-
-const AI_AGENT_URL =
-  process.env.NEXT_PUBLIC_AI_AGENT_URL || "http://localhost:8000";
+import { ApiError, apiRequest, streamApiRequest } from "@/lib/api-client";
+import type {
+  ApiResponse,
+  ChatFeedback,
+  ChatFeedbackRating,
+  ChatFeedbackReason,
+  RelatedCareDoctor,
+  RelatedCareOptions,
+  RelatedCareProduct,
+} from "@/lib/api-types";
+import { addProductToCart } from "@/lib/cart";
+import { isBookingManagementIntent } from "@/lib/consultation";
+import ChatFeedbackControls from "@/components/ChatFeedbackControls";
+import ChatPanelSizeToggle from "@/components/ChatPanelSizeToggle";
+import MarkdownMessage from "@/components/MarkdownMessage";
+import RelatedCareCards from "@/components/RelatedCareCards";
+import DoctorBookingPanel from "@/components/DoctorBookingPanel";
+import BookingManagementPanel from "@/components/BookingManagementPanel";
 
 const MAX_IMAGES = 4;
 
-const createMessageId = (prefix = "msg") =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-interface ProductRec {
-  id: string;
-  name: string;
-  unit: string;
-  price: number;
-  image: string;
-}
-
-interface DoctorRef {
-  name: string;
-  specialty: string;
-  experience: string;
-  image: string;
-  query: string;
+interface ChatSource {
+  title: string;
+  source: string;
 }
 
 interface FoodItem {
@@ -87,12 +93,66 @@ interface Message {
   sender: "ai" | "user";
   text: string;
   timestamp: string;
-  carousel?: ProductRec[];
-  doctorReferral?: DoctorRef;
+  sources?: ChatSource[];
+  isEmergency?: boolean;
+  isStreaming?: boolean;
+  failed?: boolean;
+  persisted?: boolean;
+  persistedId?: string;
+  feedback?: ChatFeedback;
+  relatedCare?: RelatedCareOptions;
   images?: string[];
   foodAnalyses?: FoodAnalysis[];
   comparison?: FoodComparison;
   suggestedQuestions?: string[];
+}
+
+interface StoredMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources: ChatSource[];
+  createdAt: string;
+  feedback?: ChatFeedback;
+  relatedCare?: RelatedCareOptions;
+}
+
+interface ChatHistory {
+  sessionId: string;
+  consentGranted: boolean;
+  messages: StoredMessage[];
+}
+
+type ProviderState =
+  | "READY"
+  | "RATE_LIMITED"
+  | "UNAVAILABLE"
+  | "NOT_CONFIGURED";
+
+interface ProviderStatus {
+  provider: "groq" | "9router";
+  model: string;
+  status: ProviderState;
+  retryAfterSeconds?: number;
+}
+
+interface ProviderStatusView extends ProviderStatus {
+  retryAt?: number;
+}
+
+interface StreamMeta {
+  sessionId: string;
+  sources: ChatSource[];
+  isEmergency: boolean;
+  relatedCare?: RelatedCareOptions;
+}
+
+interface StreamToken {
+  token: string;
+}
+
+interface StreamCompletion {
+  messageId: string;
 }
 
 interface ChatBotProps {
@@ -111,162 +171,344 @@ export default function ChatBot({
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [cart, setCart] = useState<{
-    [key: string]: { rec: ProductRec; qty: number };
-  }>({});
-  const [sessionId, setSessionId] = useState<string>("");
+  const [isSending, setIsSending] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [consentGranted, setConsentGranted] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [bookingDoctor, setBookingDoctor] = useState<RelatedCareDoctor | null>(
+    null,
+  );
+  const [bookingManagementOpen, setBookingManagementOpen] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [providerStatus, setProviderStatus] =
+    useState<ProviderStatusView | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handledInitialQueryRef = useRef<string | null>(null);
   const latestFoodContextRef = useRef("");
 
-  useEffect(() => {
-    const stored = localStorage.getItem("gluco_chat_session_id");
-    if (stored) {
-      setSessionId(stored);
-    } else {
-      const newId =
-        "session-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem("gluco_chat_session_id", newId);
-      setSessionId(newId);
+  const refreshProviderStatus = useCallback(async () => {
+    try {
+      const response =
+        await apiRequest<ApiResponse<ProviderStatus>>("/api/chat/status");
+      setProviderStatus({
+        ...response.data,
+        ...(response.data.retryAfterSeconds
+          ? { retryAt: Date.now() + response.data.retryAfterSeconds * 1_000 }
+          : {}),
+      });
+    } catch {
+      setProviderStatus({
+        provider: "groq",
+        model: "",
+        status: "READY",
+      });
     }
   }, []);
 
-  const [showResetModal, setShowResetModal] = useState(false);
-
-  const scrollToBottom = () => {
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const executeResetChat = async () => {
-    try {
-      await fetch(`${AI_AGENT_URL}/api/chat`, { method: "DELETE" });
-    } catch (e) {
-      console.warn("Gagal mereset session di backend:", e);
-    }
-
-    setMessages([]);
-    setInput("");
-    setSelectedImages([]);
-    setCart({});
-    latestFoodContextRef.current = "";
-
-    const newId = "session-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem("gluco_chat_session_id", newId);
-    setSessionId(newId);
-  };
+  }, [messages, isSending, isAnalyzing, chatError, selectedImages]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping, isAnalyzing, selectedImages]);
+    if (!isOpen) return;
 
-  const generateAIResponse = useCallback(
-    async (userText: string) => {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (showResetModal) setShowResetModal(false);
+        else if (bookingDoctor) setBookingDoctor(null);
+        else if (bookingManagementOpen) setBookingManagementOpen(false);
+        else onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [bookingDoctor, bookingManagementOpen, showResetModal, isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const initialRefresh = window.setTimeout(
+      () => void refreshProviderStatus(),
+      0,
+    );
+    const clock = window.setInterval(() => setNow(Date.now()), 1_000);
+    const refresh = window.setInterval(
+      () => void refreshProviderStatus(),
+      15_000,
+    );
+    return () => {
+      window.clearTimeout(initialRefresh);
+      window.clearInterval(clock);
+      window.clearInterval(refresh);
+    };
+  }, [isOpen, refreshProviderStatus]);
+
+  useEffect(() => {
+    if (!isOpen || historyLoaded) return;
+
+    let cancelled = false;
+    const loadHistory = async () => {
       try {
-        const messageForAI = latestFoodContextRef.current
-          ? `${userText}\n\nKONTEKS ANALISIS MAKANAN TERAKHIR:\n${latestFoodContextRef.current}`
-          : userText;
-        const response = await fetch(`${AI_AGENT_URL}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            session_id: sessionId,
-            message: messageForAI,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`AI Agent error: ${response.status}`);
+        const response =
+          await apiRequest<ApiResponse<ChatHistory>>("/api/chat");
+        if (!cancelled) {
+          setConsentGranted(response.data.consentGranted);
+          setMessages(
+            response.data.messages.map((message, index, all) => ({
+              ...toUiMessage(message),
+              failed: index === all.length - 1 && message.role === "user",
+            })),
+          );
         }
-
-        const data = await response.json();
-
-        setTimeout(() => {
-          setIsTyping(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: createMessageId("ai"),
-              sender: "ai",
-              text: data.response_text,
-              timestamp: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              carousel: data.products || [],
-              doctorReferral: data.doctor || undefined,
-              suggestedQuestions: data.suggested_questions || [],
-            },
-          ]);
-        }, 500);
       } catch (error) {
-        console.error("AI Agent error:", error);
-        const isTimeout =
-          error instanceof Error && error.name === "AbortError";
-        const fallbackText = isTimeout
-          ? "Layanan AI memerlukan waktu lebih lama untuk merespons. Silakan coba kirim ulang pertanyaan Anda."
-          : "Maaf, saya sedang mengalami kendala teknis. Silakan coba lagi dalam beberapa saat.";
-
-        setTimeout(() => {
-          setIsTyping(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: createMessageId("ai-err"),
-              sender: "ai",
-              text: fallbackText,
-              timestamp: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-            },
-          ]);
-        }, 500);
+        if (
+          !cancelled &&
+          (!(error instanceof ApiError) || error.status !== 401)
+        ) {
+          setChatError(errorMessage(error));
+        }
       } finally {
-        window.clearTimeout(timeoutId);
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    };
+
+    void loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyLoaded, isOpen]);
+
+  const streamResponse = useCallback(
+    async (
+      path: "/api/chat/stream" | "/api/chat/retry/stream",
+      body: unknown,
+      userMessageId: string,
+    ) => {
+      const assistantMessageId = crypto.randomUUID();
+      let completed = false;
+      let tokenBuffer = "";
+      let animationFrame: number | undefined;
+
+      const flushTokens = () => {
+        if (!tokenBuffer) return;
+        const tokens = tokenBuffer;
+        tokenBuffer = "";
+        setMessages((previous) =>
+          previous.map((message) =>
+            message.id === assistantMessageId
+              ? { ...message, text: message.text + tokens }
+              : message,
+          ),
+        );
+      };
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: assistantMessageId,
+          sender: "ai",
+          text: "",
+          timestamp: formatTime(new Date()),
+          sources: [],
+          isStreaming: true,
+        },
+      ]);
+      setChatError(null);
+      setIsSending(true);
+
+      try {
+        await streamApiRequest(
+          path,
+          { method: "POST", body },
+          ({ event, data }) => {
+            if (event === "meta" && isStreamMeta(data)) {
+              setMessages((previous) =>
+                updateMessage(previous, assistantMessageId, {
+                  sources: data.sources,
+                  isEmergency: data.isEmergency,
+                  relatedCare: data.relatedCare,
+                }).map((message) =>
+                  message.id === userMessageId
+                    ? { ...message, persisted: true }
+                    : message,
+                ),
+              );
+            }
+
+            if (event === "token" && isStreamToken(data)) {
+              tokenBuffer += data.token;
+              if (animationFrame === undefined) {
+                animationFrame = window.requestAnimationFrame(() => {
+                  animationFrame = undefined;
+                  flushTokens();
+                });
+              }
+            }
+
+            if (event === "done" && isStreamCompletion(data)) {
+              if (animationFrame !== undefined)
+                window.cancelAnimationFrame(animationFrame);
+              animationFrame = undefined;
+              flushTokens();
+              completed = true;
+              setMessages((previous) =>
+                updateMessage(previous, assistantMessageId, {
+                  isStreaming: false,
+                  persistedId: data.messageId,
+                  timestamp: formatTime(new Date()),
+                }),
+              );
+            }
+          },
+        );
+
+        if (!completed) {
+          throw new ApiError(
+            502,
+            "STREAM_INTERRUPTED",
+            "Jawaban terputus sebelum selesai. Silakan coba lagi.",
+          );
+        }
+      } catch (error) {
+        if (animationFrame !== undefined)
+          window.cancelAnimationFrame(animationFrame);
+        setMessages((previous) =>
+          previous
+            .filter((message) => message.id !== assistantMessageId)
+            .map((message) =>
+              message.id === userMessageId
+                ? { ...message, failed: true }
+                : message,
+            ),
+        );
+        setChatError(errorMessage(error));
+        updateProviderFromError(error, setProviderStatus);
+      } finally {
+        setIsSending(false);
+        void refreshProviderStatus();
       }
     },
-    [sessionId],
+    [refreshProviderStatus],
+  );
+
+  const submitFeedback = useCallback(
+    async (
+      messageId: string,
+      rating: ChatFeedbackRating,
+      reason?: ChatFeedbackReason,
+    ) => {
+      const response = await apiRequest<
+        ApiResponse<ChatFeedback & { messageId: string }>
+      >(`/api/chat/messages/${messageId}/feedback`, {
+        method: "POST",
+        body: { rating, reason },
+      });
+      setMessages((previous) =>
+        previous.map((message) =>
+          message.persistedId === messageId || message.id === messageId
+            ? { ...message, feedback: response.data }
+            : message,
+        ),
+      );
+    },
+    [],
   );
 
   const sendMessage = useCallback(
-    (query: string) => {
-      if (!query.trim()) return;
+    async (rawQuery: string) => {
+      const query = rawQuery.trim();
+      if (!query) return;
 
       const userMessage: Message = {
-        id: createMessageId("user"),
+        id: crypto.randomUUID(),
         sender: "user",
         text: query,
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        timestamp: formatTime(new Date()),
+        persisted: false,
       };
 
-      setMessages((prev) => [...prev, userMessage]);
-      setIsTyping(true);
-      generateAIResponse(query);
+      setMessages((previous) => [...previous, userMessage]);
+      await streamResponse(
+        "/api/chat/stream",
+        { message: query, consentToDataProcessing: true },
+        userMessage.id,
+      );
     },
-    [generateAIResponse],
+    [streamResponse],
   );
 
-  const stripBase64 = (dataUrl: string) => dataUrl.split(",")[1] || dataUrl;
+  useEffect(() => {
+    if (!isOpen) {
+      handledInitialQueryRef.current = null;
+      return;
+    }
 
-  const buildFoodContext = (analyses: FoodAnalysis[], comparison?: FoodComparison) => {
-    const summary = analyses.map((analysis, index) => {
-      const nutrition = analysis.total_nutrition;
-      return `Gambar ${index + 1}: karbo ${nutrition?.carbs_grams ?? "?"}g, protein ${nutrition?.protein_grams ?? "?"}g, kalori ${nutrition?.calories ?? "?"}, dampak glikemik ${analysis.glycemic_impact}, skor ${analysis.balance_score}/10, saran: ${analysis.advice}`;
+    if (initialQuery && handledInitialQueryRef.current !== initialQuery) {
+      handledInitialQueryRef.current = initialQuery;
+      sendMessage(initialQuery);
+    }
+  }, [initialQuery, isOpen, sendMessage]);
+
+  const handleSendMessage = (textToSend?: string) => {
+    const query = textToSend || input;
+    sendMessage(query);
+    if (!textToSend && query.trim()) setInput("");
+  };
+
+  const handleResetChat = async () => {
+    setIsSending(true);
+    try {
+      await apiRequest("/api/chat", { method: "DELETE" });
+      setMessages([]);
+      setInput("");
+      setSelectedImages([]);
+      setChatError(null);
+      latestFoodContextRef.current = "";
+      setConsentGranted(false);
+      setHistoryLoaded(false);
+    } catch (error) {
+      setChatError(errorMessage(error));
+    } finally {
+      setIsSending(false);
+      setShowResetModal(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.sender === "user");
+    if (!lastUserMessage) return;
+
+    await streamResponse(
+      "/api/chat/retry/stream",
+      { consentToDataProcessing: true },
+      lastUserMessage.id,
+    );
+  };
+
+  const handleBuyProduct = (product: RelatedCareProduct) => {
+    addProductToCart({
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      category: product.category,
+      price: product.price,
+      image: product.image,
     });
-    const comparisonSummary = comparison
-      ? `Pilihan lebih baik: ${comparison.better_choice}. ${comparison.comparison_text} Rekomendasi: ${comparison.recommendation}`
-      : "";
-    return [...summary, comparisonSummary].filter(Boolean).join("\n");
+    router.push("/checkout");
+  };
+
+  const handleViewCatalogItem = (type: "product" | "doctor", slug: string) => {
+    router.push(`/#${type === "product" ? "obat" : "dokter"}`);
+    onClose();
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -302,77 +544,47 @@ export default function ChatBot({
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const stripBase64 = (dataUrl: string) => dataUrl.split(",")[1] || dataUrl;
+
   const handleAnalyzeFood = async () => {
     if (!selectedImages.length || isAnalyzing) return;
 
     setIsAnalyzing(true);
     const images = [...selectedImages];
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: createMessageId("user-food"),
-        sender: "user",
-        text:
-          images.length > 1
-            ? `📸 Bandingkan ${images.length} foto makanan`
-            : "📸 Analisis foto makanan saya",
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        images,
-      },
-    ]);
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      sender: "user",
+      text:
+        images.length > 1
+          ? `📸 Bandingkan ${images.length} foto makanan`
+          : "📸 Analisis foto makanan saya",
+      timestamp: formatTime(new Date()),
+      images,
+    };
 
-    const aiMessageId = createMessageId("ai-food");
+    setMessages((prev) => [...prev, userMessage]);
+    const aiMessageId = crypto.randomUUID();
 
     try {
-      let foodAnalyses: FoodAnalysis[] = [];
-      let comparison: FoodComparison | undefined;
-
-      if (images.length === 1) {
-        const response = await fetch(`${AI_AGENT_URL}/api/food/analyze`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image_base64: stripBase64(images[0]),
-            user_note: "",
-          }),
-        });
-        if (!response.ok) throw new Error(`Analyze error: ${response.status}`);
-        const result: FoodAnalysis = await response.json();
-        result.label = "Gambar 1";
-        foodAnalyses = [result];
-        latestFoodContextRef.current = buildFoodContext(foodAnalyses);
-      } else {
-        const response = await fetch(`${AI_AGENT_URL}/api/food/compare`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            images: images.map(stripBase64),
-            user_note: "",
-          }),
-        });
-        if (!response.ok) throw new Error(`Compare error: ${response.status}`);
-        const result = await response.json();
-        foodAnalyses = result.analyses || [];
-        comparison = result.comparison || undefined;
-        latestFoodContextRef.current = buildFoodContext(foodAnalyses, comparison);
-      }
+      const response = await apiRequest<ApiResponse<any>>("/api/chat", {
+        method: "POST",
+        body: {
+          message: images.length > 1 ? "Bandingkan foto makanan berikut" : "Analisis foto makanan berikut",
+          image: images[0],
+          consentToDataProcessing: true,
+        },
+      });
 
       setMessages((prev) => [
         ...prev,
         {
           id: aiMessageId,
           sender: "ai",
-          text: "",
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          foodAnalyses,
-          comparison,
+          text: response.data.reply || "Analisis foto makanan selesai.",
+          timestamp: formatTime(new Date()),
+          sources: response.data.sources || [],
+          relatedCare: response.data.relatedCare,
         },
       ]);
     } catch (error) {
@@ -382,11 +594,8 @@ export default function ChatBot({
         {
           id: aiMessageId,
           sender: "ai",
-          text: "Maaf, saya tidak dapat menganalisis gambar ini.",
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          text: "Maaf, foto makanan belum dapat dianalisis saat ini. Silakan coba lagi.",
+          timestamp: formatTime(new Date()),
         },
       ]);
     } finally {
@@ -395,639 +604,349 @@ export default function ChatBot({
     }
   };
 
-  useEffect(() => {
-    if (!isOpen) {
-      handledInitialQueryRef.current = null;
-      return;
-    }
-
-    if (initialQuery && handledInitialQueryRef.current !== initialQuery) {
-      handledInitialQueryRef.current = initialQuery;
-      sendMessage(initialQuery);
-    }
-  }, [initialQuery, isOpen, sendMessage]);
-
-  const handleSendMessage = (textToSend?: string) => {
-    const query = textToSend || input;
-    sendMessage(query);
-    if (!textToSend && query.trim()) setInput("");
-  };
-
-  const updateCart = (product: ProductRec, delta: number) => {
-    setCart((prev) => {
-      const currentQty = prev[product.id]?.qty || 0;
-      const newQty = currentQty + delta;
-      if (newQty <= 0) {
-        const copy = { ...prev };
-        delete copy[product.id];
-        return copy;
-      }
-      return {
-        ...prev,
-        [product.id]: { rec: product, qty: newQty },
-      };
-    });
-  };
-
-  const totalCartItems = Object.values(cart).reduce(
-    (sum, item) => sum + item.qty,
-    0,
+  const providerBlocked = isProviderBlocked(providerStatus, now);
+  const failedMessage = useMemo(
+    () => messages.find((message) => message.failed),
+    [messages],
   );
-  const totalCartPrice = Object.values(cart).reduce(
-    (sum, item) => sum + item.rec.price * item.qty,
-    0,
-  );
-
-  const formatRupiah = (val: number) => {
-    return "Rp" + val.toLocaleString("id-ID");
-  };
-
-  const getGlycemicColor = (impact: string) => {
-    switch (impact?.toLowerCase()) {
-      case "rendah":
-        return "text-emerald-600 bg-emerald-50";
-      case "sedang":
-        return "text-amber-600 bg-amber-50";
-      case "tinggi":
-        return "text-red-600 bg-red-50";
-      default:
-        return "text-gray-600 bg-gray-50";
-    }
-  };
-
-  const renderFoodCard = (fa: FoodAnalysis, index: number, total: number) => (
-    <div
-      key={index}
-      className="w-full bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-[#0D5C46]/20 rounded-2xl p-4 space-y-3 shadow-sm"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-bold text-[#0D5C46] uppercase tracking-wider">
-          <Utensils className="w-4 h-4" />
-          <span>Analisis Makanan</span>
-        </div>
-        {total > 1 && (
-          <span className="text-[10px] font-bold bg-[#0D5C46] text-white px-2 py-0.5 rounded-full">
-            {fa.label || `Gambar ${index + 1}`}
-          </span>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl p-3 border border-gray-100">
-        <p className="text-xs text-gray-700 leading-relaxed">
-          {fa.balance_assessment}
-        </p>
-      </div>
-
-      {fa.total_nutrition && (
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-white rounded-lg p-2 border border-gray-100 text-center">
-            <div className="text-[9px] text-gray-500 uppercase tracking-wide">Karbo</div>
-            <div className="text-sm font-bold text-amber-600 mt-0.5">
-              {fa.total_nutrition.carbs_grams}g
-            </div>
-          </div>
-          <div className="bg-white rounded-lg p-2 border border-gray-100 text-center">
-            <div className="text-[9px] text-gray-500 uppercase tracking-wide">Protein</div>
-            <div className="text-sm font-bold text-emerald-600 mt-0.5">
-              {fa.total_nutrition.protein_grams}g
-            </div>
-          </div>
-          <div className="bg-white rounded-lg p-2 border border-gray-100 text-center">
-            <div className="text-[9px] text-gray-500 uppercase tracking-wide">Kalori</div>
-            <div className="text-sm font-bold text-blue-600 mt-0.5">
-              {fa.total_nutrition.calories}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] text-gray-500 uppercase tracking-wide">
-          Dampak Glikemik:
-        </span>
-        <span
-          className={`text-[11px] font-bold px-2 py-0.5 rounded-full uppercase ${getGlycemicColor(
-            fa.glycemic_impact,
-          )}`}
-        >
-          {fa.glycemic_impact}
-        </span>
-        <span className="text-[10px] text-gray-500 ml-auto">
-          Skor {fa.balance_score}/10
-        </span>
-      </div>
-
-      {fa.detected_items?.length > 0 && (
-        <div>
-          <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1.5">
-            Item Terdeteksi:
-          </div>
-          <div className="space-y-2">
-            {fa.detected_items.map((item, idx) => (
-              <div key={idx} className="bg-white border border-gray-200 rounded-xl p-2.5">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-semibold text-gray-800">{item.name}</span>
-                  <span className="text-[10px] text-gray-500">
-                    {item.portion} · ±{item.estimated_weight_grams || 0}g
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                    Karbo {item.carbs_grams || 0}g
-                  </span>
-                  <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-                    Protein {item.protein_grams || 0}g
-                  </span>
-                  <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                    {item.calories || 0} kkal
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="bg-[#0D5C46] text-white rounded-xl p-3">
-        <div className="text-[10px] uppercase tracking-wide opacity-80 mb-1">💡 Saran</div>
-        <p className="text-xs leading-relaxed">{fa.advice}</p>
-      </div>
-
-      {fa.suggested_questions?.length > 0 && (
-        <div className="space-y-1.5 pt-1">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wide">
-            Pertanyaan lanjutan:
-          </div>
-          {fa.suggested_questions.map((q, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSendMessage(q)}
-              className="w-full text-left text-[11px] bg-white hover:bg-gray-50 border border-gray-200 hover:border-[#E07A5F] px-3 py-2 rounded-lg text-gray-700 hover:text-[#E07A5F] transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <ArrowRight className="w-3 h-3 shrink-0" />
-              <span className="line-clamp-1">{q}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+  const latestAssistantMessageId = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find((message) => message.sender === "ai" && !message.isStreaming)?.id,
+    [messages],
   );
 
   return (
     <>
+      {/* Floating Trigger Button */}
       {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <button
-            onClick={() => onOpen()}
-            className="group flex items-center gap-3 bg-white text-[#0D5C46] px-4 py-2.5 rounded-2xl shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border border-[#E8E4DE] cursor-pointer"
-          >
-            <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 shadow-sm border border-[#0D5C46]/20">
-              <Image
-                src="/images/glucocare_logo.svg"
-                alt="GlucoAssistant Logo"
-                fill
-                className="object-cover"
-              />
-            </div>
-            <div className="text-left pr-1">
-              <div className="font-extrabold text-sm text-[#0D5C46] leading-tight">
-                GlucoAssistant
-              </div>
-              <div className="text-[10px] text-[#E07A5F] font-semibold">
-                by GlucoCare AI
-              </div>
-            </div>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onOpen()}
+          aria-label="Buka konsultasi GlucoCare AI"
+          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[#0D5C46] text-white shadow-2xl transition-all duration-300 hover:scale-110 hover:bg-[#094232] active:scale-95 sm:h-16 sm:w-16"
+        >
+          <Stethoscope className="h-7 w-7" />
+          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E07A5F] opacity-75" />
+            <span className="relative inline-flex h-4 w-4 rounded-full bg-[#E07A5F]" />
+          </span>
+        </button>
       )}
 
+      {/* Main Chat Drawer / Modal */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[420px] h-[620px] max-h-[88vh] bg-white border border-[#E8E4DE] rounded-3xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-6">
-          <div className="bg-[#0D5C46] text-white px-4 py-3.5 flex items-center justify-between shrink-0 shadow-sm">
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-2">
-              <div className="relative w-7 h-7 rounded-full overflow-hidden shrink-0 border border-white/30">
-                <Image
-                  src="/images/glucocare_logo.svg"
-                  alt="GlucoAssistant Logo"
-                  fill
-                  className="object-cover"
-                />
+        <section
+          aria-label="Konsultasi GlucoAssistant"
+          className={`fixed z-50 flex flex-col overflow-hidden bg-white shadow-2xl transition-all duration-300 ${
+            isExpanded
+              ? "inset-0 h-full w-full rounded-none sm:inset-4 sm:h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-5xl sm:rounded-3xl sm:border sm:border-gray-200"
+              : "inset-0 h-full w-full rounded-none sm:inset-auto sm:right-6 sm:bottom-6 sm:h-[640px] sm:w-[420px] sm:max-h-[calc(100vh-3rem)] sm:rounded-3xl sm:border sm:border-gray-200"
+          }`}
+        >
+          {/* Header */}
+          <header className="relative flex shrink-0 items-center justify-between border-b border-[#1A8B6B]/80 bg-[#0D5C46] px-4 py-3.5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-xs">
+                <Stethoscope className="h-5 w-5 text-emerald-200" />
               </div>
-              <span className="font-bold text-sm tracking-tight text-white">
-                GlucoAssistant{" "}
-                <span className="text-[10px] font-normal text-[#F4A261] ml-0.5">
-                  Sp.PD Referral
-                </span>
-              </span>
+              <div>
+                <h2 className="text-sm font-bold leading-tight text-white">
+                  GlucoAssistant AI
+                </h2>
+                <p className="text-[10px] font-medium text-emerald-200/90">
+                  Edukasi & Skrining Diabetes
+                </p>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowResetModal(true)}
-              title="Reset / Hapus Percakapan"
-              disabled={messages.length === 0}
-              className={`w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white transition-all cursor-pointer ${
-                messages.length === 0
-                  ? "opacity-30 cursor-not-allowed"
-                  : "hover:bg-red-500/80 hover:text-white"
-              }`}
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <ChatPanelSizeToggle
+                isExpanded={isExpanded}
+                onToggle={() => setIsExpanded(!isExpanded)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowResetModal(true)}
+                disabled={isSending}
+                title="Reset Percakapan"
+                aria-label="Reset Percakapan"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Tutup jendela chat"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </header>
+
+          {/* Provider Status Indicator */}
+          <div className="bg-[#0A4837] py-1">
+            <ProviderBadge status={providerStatus} now={now} />
           </div>
 
-          <div className="flex-1 p-4 overflow-y-auto space-y-6 bg-white">
+          {/* Messages Container */}
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
             {messages.length === 0 && (
-              <div className="text-center space-y-6 pt-4 px-2">
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-700 leading-relaxed font-medium">
-                    Hai, aku{" "}
-                    <strong className="text-[#0D5C46]">GlucoAssistant</strong>,
-                    asisten AI untuk konsultasi kadar gula darah & penyakit
-                    gula. Aku bisa merekomendasikan obat, alat cek digital,
-                    analisis foto makanan, serta menyambungkanmu ke{" "}
-                    <strong>Dokter Spesialis Sp.PD</strong>.
-                  </p>
-                  <p className="text-sm text-gray-600 font-normal">
-                    Mau mulai? Tanya saja atau pilih topik berikut.
+              <div className="space-y-4 py-4 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-emerald-50 text-[#0D5C46]">
+                  <Stethoscope className="h-7 w-7" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Halo! Ada yang bisa kami bantu?
+                  </h3>
+                  <p className="text-xs text-gray-500 max-w-xs mx-auto">
+                    Tanyakan keluhan gula darah, obat, nutrisi, atau unggah foto makanan untuk dianalisis.
                   </p>
                 </div>
 
-                <div className="space-y-3 pt-2">
-                  <button
+                <div className="grid grid-cols-1 gap-2 pt-2 text-left">
+                  <TopicButton
+                    icon={<Syringe className="h-4 w-4 text-emerald-600" />}
+                    label="Gula darah puasa saya di atas 140 mg/dL"
                     onClick={() =>
                       handleSendMessage(
-                        "Berapa kadar gula darah puasa yang tergolong aman?",
+                        "Gula darah puasa saya di atas 140 mg/dL, apa langkah awal yang aman?",
                       )
                     }
-                    className="w-full flex items-center gap-3.5 bg-white border border-gray-200 hover:border-[#E07A5F] p-3.5 rounded-2xl text-left shadow-2xs hover:shadow-sm transition-all group cursor-pointer"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#0D5C46] flex items-center justify-center shrink-0">
-                      <ShoppingCart className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-semibold text-gray-800 group-hover:text-[#E07A5F]">
-                      Berapa kadar gula darah puasa yang aman?
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full flex items-center gap-3.5 bg-white border border-gray-200 hover:border-[#E07A5F] p-3.5 rounded-2xl text-left shadow-2xs hover:shadow-sm transition-all group cursor-pointer"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-orange-50 text-[#E07A5F] flex items-center justify-center shrink-0">
-                      <Camera className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-semibold text-gray-800 group-hover:text-[#E07A5F]">
-                      📸 Analisis / bandingkan foto makanan
-                    </span>
-                  </button>
-
-                  <button
+                    color="bg-emerald-50"
+                    disabled={!consentGranted || isSending}
+                  />
+                  <TopicButton
+                    icon={<Utensils className="h-4 w-4 text-amber-600" />}
+                    label="Panduan pola makan & porsi karbohidrat"
                     onClick={() =>
                       handleSendMessage(
-                        "Luka diabetes saya lambat sembuh, mau konsul ke Dokter Spesialis.",
+                        "Bagaimana aturan porsi karbohidrat dan pola makan aman diabetes?",
                       )
                     }
-                    className="w-full flex items-center gap-3.5 bg-white border border-gray-200 hover:border-[#E07A5F] p-3.5 rounded-2xl text-left shadow-2xs hover:shadow-sm transition-all group cursor-pointer"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0">
-                      <Syringe className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-semibold text-gray-800 group-hover:text-[#E07A5F]">
-                      Luka diabetes saya lambat sembuh, butuh Dokter Spesialis.
-                    </span>
-                  </button>
+                    color="bg-amber-50"
+                    disabled={!consentGranted || isSending}
+                  />
+                  <TopicButton
+                    icon={<CalendarSearch className="h-4 w-4 text-teal-600" />}
+                    label="Jadwal & Konsultasi Dokter Spesialis"
+                    onClick={() =>
+                      handleSendMessage(
+                        "Saya ingin tahu jadwal dokter spesialis penyakit dalam untuk konsultasi.",
+                      )
+                    }
+                    color="bg-teal-50"
+                    disabled={!consentGranted || isSending}
+                  />
                 </div>
               </div>
             )}
 
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`space-y-3 ${
-                  msg.sender === "user"
-                    ? "flex flex-col items-end"
-                    : "flex flex-col items-start"
-                }`}
-              >
-                {msg.sender === "user" && msg.images && msg.images.length > 0 && (
-                  <div className="flex gap-2 flex-wrap max-w-[88%] justify-end">
-                    {msg.images.map((img, i) => (
-                      <img
-                        key={i}
-                        src={img}
-                        alt={`Uploaded ${i + 1}`}
-                        className="w-24 h-24 object-cover rounded-xl border-2 border-[#0D5C46]/30 shadow-sm"
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {msg.text && (
+            <div aria-live="polite" className="contents">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`space-y-2 ${
+                    message.sender === "user"
+                      ? "flex flex-col items-end"
+                      : "flex flex-col items-start"
+                  }`}
+                >
                   <div
-                    className={`max-w-[88%] text-sm leading-relaxed ${
-                      msg.sender === "user"
-                        ? "bg-[#0D5C46] text-white px-4 py-3 rounded-2xl rounded-tr-xs"
-                        : "text-gray-800 font-normal pr-4"
+                    className={`max-w-[92%] text-sm leading-relaxed sm:max-w-[88%] ${
+                      isExpanded ? "sm:max-w-[82%]" : ""
+                    } ${
+                      message.sender === "user"
+                        ? `rounded-2xl rounded-tr-xs bg-[#0D5C46] px-4 py-3 text-white ${
+                            message.failed ? "ring-2 ring-red-300" : ""
+                          }`
+                        : message.isEmergency
+                          ? "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 font-semibold text-red-700"
+                          : "pr-4 font-normal text-gray-800"
                     }`}
                   >
-                    <FormattedMarkdown content={msg.text} isUser={msg.sender === "user"} />
-                  </div>
-                )}
-
-                {msg.foodAnalyses &&
-                  msg.foodAnalyses.map((fa, idx) =>
-                    renderFoodCard(fa, idx, msg.foodAnalyses!.length),
-                  )}
-
-                {msg.comparison && (
-                  <div className="w-full bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-[#E07A5F]/30 rounded-2xl p-4 space-y-3 shadow-sm">
-                    <div className="flex items-center gap-2 text-xs font-bold text-[#E07A5F] uppercase tracking-wider">
-                      <Scale className="w-4 h-4" />
-                      <span>Perbandingan</span>
-                    </div>
-
-                    <div className="bg-white rounded-xl p-3 border border-gray-100">
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">
-                        Pilihan Lebih Baik
-                      </div>
-                      <div className="text-sm font-bold text-[#0D5C46] mt-0.5">
-                        {msg.comparison.better_choice}
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-gray-700 leading-relaxed">
-                      {msg.comparison.comparison_text}
-                    </p>
-
-                    <div className="bg-[#E07A5F] text-white rounded-xl p-3">
-                      <div className="text-[10px] uppercase tracking-wide opacity-80 mb-1">
-                        💡 Rekomendasi
-                      </div>
-                      <p className="text-xs leading-relaxed">
-                        {msg.comparison.recommendation}
-                      </p>
-                    </div>
-
-                    {msg.comparison.suggested_questions?.length > 0 && (
-                      <div className="space-y-1.5 pt-1">
-                        {msg.comparison.suggested_questions.map((q, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleSendMessage(q)}
-                            className="w-full text-left text-[11px] bg-white hover:bg-gray-50 border border-gray-200 hover:border-[#E07A5F] px-3 py-2 rounded-lg text-gray-700 hover:text-[#E07A5F] transition-all flex items-center gap-2 cursor-pointer"
+                    {message.images && message.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {message.images.map((img, i) => (
+                          <div
+                            key={i}
+                            className="relative h-16 w-16 rounded-xl overflow-hidden border border-white/20"
                           >
-                            <ArrowRight className="w-3 h-3 shrink-0" />
-                            <span className="line-clamp-1">{q}</span>
-                          </button>
+                            <Image
+                              src={img}
+                              alt="Upload"
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
                         ))}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {msg.doctorReferral && (
-                  <div className="w-full bg-[#FAF8F5] border-2 border-[#0D5C46]/30 rounded-2xl p-4 space-y-3 shadow-xs my-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-[#E07A5F] uppercase tracking-wider">
-                      <Stethoscope className="w-4 h-4 text-[#0D5C46]" />
-                      <span>Rujukan Dokter Spesialis Langsung:</span>
-                    </div>
+                    {message.isEmergency && (
+                      <AlertTriangle className="mb-2 h-5 w-5" />
+                    )}
 
-                    <div className="flex items-center gap-3.5 bg-white p-3 rounded-xl border border-gray-200">
-                      <div className="relative w-12 h-14 rounded-lg overflow-hidden shrink-0 border border-gray-200">
-                        <Image
-                          src={msg.doctorReferral.image}
-                          alt={msg.doctorReferral.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-xs text-[#0D5C46] truncate">
-                          {msg.doctorReferral.name}
-                        </h4>
-                        <span className="text-[11px] font-semibold text-[#E07A5F] block">
-                          {msg.doctorReferral.specialty}
-                        </span>
-                        <span className="text-[10px] text-gray-500 block mt-0.5">
-                          {msg.doctorReferral.experience}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleSendMessage(msg.doctorReferral?.query)}
-                      className="w-full bg-[#0D5C46] hover:bg-[#1A8B6B] text-white font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <span>Hubungkan Chat ke Dokter Ini</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-[#E07A5F]" />
-                    </button>
-                  </div>
-                )}
-
-                {msg.carousel && msg.carousel.length > 0 && (
-                  <div className="w-full pt-1">
-                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar scroll-smooth">
-                      {msg.carousel.map((prod) => {
-                        const inCartQty = cart[prod.id]?.qty || 0;
-                        return (
-                          <div
-                            key={prod.id}
-                            className="w-[200px] bg-white border border-gray-200 rounded-2xl p-3 shrink-0 flex flex-col justify-between shadow-2xs space-y-3"
-                          >
-                            <div className="space-y-2">
-                              <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-                                <Image
-                                  src={prod.image}
-                                  alt={prod.name}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-
-                              <div>
-                                <h4 className="font-bold text-xs text-gray-900 leading-snug line-clamp-2">
-                                  {prod.name}
-                                </h4>
-                                <span className="text-[10px] text-gray-500 block mt-0.5">
-                                  {prod.unit}
-                                </span>
-                              </div>
-
-                              <div className="font-bold text-xs text-gray-900">
-                                {formatRupiah(prod.price)}
-                              </div>
-                            </div>
-
-                            <div>
-                              {inCartQty === 0 ? (
-                                <button
-                                  onClick={() => updateCart(prod, 1)}
-                                  className="w-full border border-[#E07A5F] hover:bg-[#E07A5F] text-[#E07A5F] hover:text-white font-bold text-xs py-2 rounded-xl transition-all active:scale-95 cursor-pointer"
-                                >
-                                  Tambah
-                                </button>
-                              ) : (
-                                <div className="flex items-center justify-between border border-[#E07A5F] rounded-xl p-1 bg-[#FAF8F5]">
-                                  <button
-                                    onClick={() => updateCart(prod, -1)}
-                                    className="w-6 h-6 rounded-lg bg-white border border-gray-200 text-[#E07A5F] flex items-center justify-center font-bold text-xs"
-                                  >
-                                    -
-                                  </button>
-                                  <span className="font-bold text-xs text-[#0D5C46]">
-                                    {inCartQty}
-                                  </span>
-                                  <button
-                                    onClick={() => updateCart(prod, 1)}
-                                    className="w-6 h-6 rounded-lg bg-[#E07A5F] text-white flex items-center justify-center font-bold text-xs"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 🔥 SUGGESTED QUESTIONS CHIPS (BARU) */}
-                {msg.sender === "ai" && msg.suggestedQuestions && msg.suggestedQuestions.length > 0 && (
-                  <div className="w-full space-y-2 pt-2">
-                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 uppercase tracking-wide">
-                      <MessageCircle className="w-3 h-3" />
-                      <span>Tanya lebih lanjut:</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {msg.suggestedQuestions.map((q, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleSendMessage(q)}
-                          disabled={isTyping || isAnalyzing}
-                          className="text-[11px] bg-[#0D5C46]/5 hover:bg-[#0D5C46]/10 border border-[#0D5C46]/20 hover:border-[#0D5C46]/40 text-[#0D5C46] px-3 py-1.5 rounded-full transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sm"
+                    {message.isStreaming && !message.text ? (
+                      <TypingIndicator />
+                    ) : (
+                      <div>
+                        <MarkdownMessage
+                          variant={
+                            message.sender === "user" ? "inverse" : "default"
+                          }
                         >
-                          {q}
-                        </button>
-                      ))}
-                    </div>
+                          {message.text}
+                        </MarkdownMessage>
+                        {message.isStreaming && (
+                          <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-[#E07A5F] align-middle" />
+                        )}
+                      </div>
+                    )}
+
+                    {!message.isStreaming &&
+                      message.sources &&
+                      message.sources.length > 0 && (
+                        <SourceList sources={message.sources} />
+                      )}
+
+                    {!message.isStreaming && message.relatedCare && (
+                      <RelatedCareCards
+                        options={message.relatedCare}
+                        onSelect={handleSendMessage}
+                        onViewProduct={(product: RelatedCareProduct) =>
+                          handleViewCatalogItem("product", product.slug)
+                        }
+                        onBuyProduct={handleBuyProduct}
+                        onViewDoctor={(doctor: RelatedCareDoctor) =>
+                          handleViewCatalogItem("doctor", doctor.slug)
+                        }
+                        onBookDoctor={setBookingDoctor}
+                        disabled={
+                          isSending || providerBlocked || !consentGranted
+                        }
+                        showSuggestions={
+                          message.id === latestAssistantMessageId
+                        }
+                      />
+                    )}
                   </div>
+
+                  {message.sender === "ai" &&
+                    !message.isStreaming &&
+                    message.persistedId && (
+                      <ChatFeedbackControls
+                        value={message.feedback}
+                        onSubmit={(rating, reason) =>
+                          submitFeedback(message.persistedId!, rating, reason)
+                        }
+                      />
+                    )}
+
+                  <span className="px-1 text-[9px] text-gray-400">
+                    {message.timestamp}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Selected Images Preview Bar */}
+            {selectedImages.length > 0 && (
+              <div className="rounded-2xl border border-dashed border-[#0D5C46]/30 bg-emerald-50/50 p-3">
+                <div className="flex items-center justify-between text-xs font-bold text-[#0D5C46] mb-2">
+                  <span>Foto Makanan Siap Analisis ({selectedImages.length}/{MAX_IMAGES})</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedImages.map((img, i) => (
+                    <div
+                      key={i}
+                      className="relative h-16 w-16 rounded-xl overflow-hidden border border-emerald-300"
+                    >
+                      <Image
+                        src={img}
+                        alt={`Preview ${i}`}
+                        fill
+                        className="object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(i)}
+                        className="absolute top-1 right-1 h-5 w-5 bg-black/60 text-white rounded-full flex items-center justify-center text-[10px]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {selectedImages.length < MAX_IMAGES && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-16 w-16 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-[#0D5C46] hover:text-[#0D5C46] transition-colors"
+                    >
+                      <Camera className="h-4 w-4" />
+                      <span className="text-[9px] mt-0.5">Tambah</span>
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAnalyzeFood}
+                  disabled={isAnalyzing}
+                  className="mt-2 w-full py-2 bg-[#0D5C46] hover:bg-[#094232] disabled:bg-gray-300 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Utensils className="h-3.5 w-3.5" />
+                  {isAnalyzing
+                    ? "Menganalisis Makanan..."
+                    : selectedImages.length > 1
+                      ? `Bandingkan ${selectedImages.length} Makanan`
+                      : "Analisis Nutrisi Makanan"}
+                </button>
+              </div>
+            )}
+
+            {failedMessage && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-900">
+                <p className="font-semibold">
+                  Pesan terakhir belum mendapat jawaban.
+                </p>
+                {chatError && (
+                  <p className="mt-1 text-amber-800">{chatError}</p>
                 )}
-
-                <span className="text-[9px] text-gray-400 block px-1">
-                  {msg.timestamp}
-                </span>
-              </div>
-            ))}
-
-            {isTyping && (
-              <div className="flex items-center gap-2 text-gray-500 py-1">
-                <span className="w-1.5 h-1.5 bg-[#E07A5F] rounded-full animate-bounce" />
-                <span className="w-1.5 h-1.5 bg-[#E07A5F] rounded-full animate-bounce [animation-delay:0.2s]" />
-                <span className="w-1.5 h-1.5 bg-[#E07A5F] rounded-full animate-bounce [animation-delay:0.4s]" />
-                <span className="text-xs text-gray-400 ml-1">
-                  GlucoAssistant menganalisis gejala...
-                </span>
+                <button
+                  type="button"
+                  disabled={!consentGranted || isSending || providerBlocked}
+                  onClick={handleRetry}
+                  className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 font-bold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${isSending ? "animate-spin" : ""}`}
+                  />
+                  Coba lagi
+                </button>
               </div>
             )}
 
-            {isAnalyzing && (
-              <div className="flex items-center gap-2 text-gray-500 py-1">
-                <Utensils className="w-4 h-4 text-[#E07A5F] animate-pulse" />
-                <span className="text-xs text-gray-400">
-                  Menganalisis foto makanan...
-                </span>
-              </div>
+            {chatError && !failedMessage && (
+              <p
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600"
+              >
+                {chatError}
+              </p>
             )}
-
             <div ref={messagesEndRef} />
           </div>
 
-          {selectedImages.length > 0 && (
-            <div className="px-3 pt-3 bg-white border-t border-gray-100">
-              <div className="flex items-start gap-2 flex-wrap">
-                {selectedImages.map((img, i) => (
-                  <div key={i} className="relative">
-                    <img
-                      src={img}
-                      alt={`Preview ${i + 1}`}
-                      className="h-20 w-20 object-cover rounded-xl border-2 border-[#E07A5F] shadow-sm"
-                    />
-                    <button
-                      onClick={() => removeImage(i)}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-
-                {selectedImages.length < MAX_IMAGES && (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-300 hover:border-[#E07A5F] flex flex-col items-center justify-center text-gray-400 hover:text-[#E07A5F] transition-colors cursor-pointer"
-                  >
-                    <Camera className="w-5 h-5" />
-                    <span className="text-[9px] mt-1">Tambah</span>
-                  </button>
-                )}
-              </div>
-
-              <button
-                onClick={handleAnalyzeFood}
-                disabled={isAnalyzing}
-                className="mt-2 mb-1 inline-flex items-center gap-1.5 bg-[#0D5C46] hover:bg-[#1A8B6B] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all cursor-pointer"
-              >
-                <Utensils className="w-3.5 h-3.5" />
-                {isAnalyzing
-                  ? "Menganalisis..."
-                  : selectedImages.length > 1
-                    ? `Bandingkan ${selectedImages.length} Makanan`
-                    : "Analisis Makanan"}
-              </button>
-            </div>
-          )}
-
-          {totalCartItems > 0 && (
-            <div className="bg-[#0D5C46] text-white px-4 py-3 flex items-center justify-between shrink-0 shadow-lg border-t border-emerald-900 animate-in slide-in-from-bottom-3">
-              <div>
-                <div className="text-xs font-bold">{totalCartItems} item terpilih</div>
-                <div className="text-[11px] text-gray-200 font-medium">
-                  Perkiraan harga{" "}
-                  <strong className="text-white">{formatRupiah(totalCartPrice)}</strong>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  const items = Object.values(cart).map((item) => ({
-                    id: item.rec.id,
-                    name: item.rec.name,
-                    unit: item.rec.unit,
-                    price: item.rec.price,
-                    image: item.rec.image,
-                    qty: item.qty,
-                  }));
-                  localStorage.setItem("myskin_cart", JSON.stringify(items));
-                  router.push("/checkout");
-                }}
-                className="bg-[#E07A5F] hover:bg-[#C9664B] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm flex items-center gap-1.5"
-              >
-                <span>Checkout</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          <div className="p-3 bg-white border-t border-gray-100 flex flex-col space-y-1">
+          {/* Footer & Input Area */}
+          <footer
+            className={`shrink-0 space-y-1 border-t border-gray-100 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 ${
+              isExpanded ? "sm:px-6 sm:py-4" : ""
+            }`}
+          >
             <input
               ref={fileInputRef}
               type="file"
@@ -1037,9 +956,24 @@ export default function ChatBot({
               className="hidden"
             />
 
+            {!consentGranted && (
+              <label className="mb-2 flex cursor-pointer items-start gap-2.5 rounded-xl border border-[#E8DFC0] bg-[#FFF9F3] px-3 py-2.5 text-[10px] leading-relaxed text-[#4A5550]">
+                <input
+                  type="checkbox"
+                  checked={consentGranted}
+                  onChange={(event) => setConsentGranted(event.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#0D5C46]"
+                />
+                <span>
+                  Saya setuju isi percakapan dan data kontak digunakan GlucoCare
+                  untuk edukasi dan tindak lanjut medis.
+                </span>
+              </label>
+            )}
+
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
+              onSubmit={(event) => {
+                event.preventDefault();
                 handleSendMessage();
               }}
               className="flex items-center gap-2"
@@ -1047,31 +981,57 @@ export default function ChatBot({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isTyping || isAnalyzing}
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-600 disabled:text-gray-300 flex items-center justify-center transition-all shrink-0 active:scale-95 cursor-pointer disabled:cursor-not-allowed"
-                title="Upload foto makanan"
+                disabled={!consentGranted || isSending || isAnalyzing}
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-all hover:bg-gray-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                title="Unggah Foto Makanan"
               >
-                <Camera className="w-4 h-4" />
+                <Camera className="h-4 w-4" />
               </button>
 
               <input
                 type="text"
                 value={input}
-                maxLength={500}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Tanyakan atau upload foto makanan..."
-                className="flex-1 bg-[#F0F2F5] focus:bg-white border border-transparent focus:border-gray-300 rounded-full px-4 py-2.5 text-xs sm:text-sm text-gray-800 placeholder-gray-400 outline-none transition-all"
+                maxLength={2000}
+                disabled={
+                  !historyLoaded ||
+                  !consentGranted ||
+                  isSending ||
+                  Boolean(failedMessage) ||
+                  providerBlocked
+                }
+                onChange={(event) => setInput(event.target.value)}
+                placeholder={
+                  !consentGranted
+                    ? "Setujui penggunaan data untuk mulai bertanya"
+                    : failedMessage
+                      ? "Coba ulang pesan terakhir terlebih dahulu"
+                      : "Tanyakan gula darah, gejala, atau foto makanan..."
+                }
+                className="flex-1 rounded-full border border-transparent bg-[#F0F2F5] px-4 py-2.5 text-xs text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:border-gray-300 focus:bg-white disabled:opacity-60 sm:text-sm"
               />
+
               <button
                 type="submit"
-                disabled={!input.trim() || isTyping}
-                className="w-9 h-9 rounded-full bg-[#E07A5F] disabled:bg-gray-200 text-white flex items-center justify-center transition-all shrink-0 active:scale-95 cursor-pointer"
+                aria-label="Kirim pesan"
+                disabled={
+                  !historyLoaded ||
+                  !consentGranted ||
+                  !input.trim() ||
+                  isSending ||
+                  Boolean(failedMessage) ||
+                  providerBlocked
+                }
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#E07A5F] text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-200"
               >
-                <Send className="w-4 h-4" />
+                <Send className="h-4 w-4" />
               </button>
             </form>
-            <div className="text-[9px] text-gray-400 pl-4">{input.length}/500</div>
-          </div>
+
+            <div className="flex items-center justify-between px-4 text-[9px] text-gray-400">
+              <span>Informasi umum, bukan pengganti konsultasi dokter.</span>
+              <span>{input.length}/2000</span>
+            </div>
+          </footer>
 
           {/* Modern Reset Modal Popup inside ChatBot */}
           {showResetModal && (
@@ -1098,10 +1058,7 @@ export default function ChatBot({
                   </button>
                   <button
                     type="button"
-                    onClick={async () => {
-                      setShowResetModal(false);
-                      await executeResetChat();
-                    }}
+                    onClick={handleResetChat}
                     className="cursor-pointer flex-1 rounded-xl bg-[#0D5C46] hover:bg-[#094232] py-2 text-xs font-bold text-white shadow-sm transition-colors"
                   >
                     Ya, Reset
@@ -1110,8 +1067,273 @@ export default function ChatBot({
               </div>
             </div>
           )}
-        </div>
+
+          {bookingDoctor && (
+            <DoctorBookingPanel
+              doctor={bookingDoctor}
+              onClose={() => setBookingDoctor(null)}
+            />
+          )}
+
+          {bookingManagementOpen && (
+            <BookingManagementPanel
+              onClose={() => setBookingManagementOpen(false)}
+            />
+          )}
+        </section>
       )}
     </>
   );
+}
+
+function ProviderBadge({
+  status,
+  now,
+}: {
+  status: ProviderStatusView | null;
+  now: number;
+}) {
+  const presentation = providerPresentation(status, now);
+  return (
+    <div className="flex justify-center">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-black/15 px-2.5 py-0.5 text-[9px] font-semibold text-white/90">
+        <span className={`h-1.5 w-1.5 rounded-full ${presentation.dotClass}`} />
+        {presentation.label}
+      </span>
+    </div>
+  );
+}
+
+function SourceList({ sources }: { sources: ChatSource[] }) {
+  return (
+    <div className="mt-3 border-t border-gray-200 pt-2 text-[10px] text-gray-500">
+      <p className="mb-1.5 flex items-center gap-1 font-bold uppercase tracking-wide text-[#0D5C46]">
+        <BookOpen className="h-3 w-3" /> Sumber informasi
+      </p>
+      <ul className="space-y-1">
+        {sources.map((source) => (
+          <li key={source.source} title={source.source}>
+            • {source.title}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-2 py-1 text-gray-500">
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#E07A5F]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#E07A5F] [animation-delay:0.2s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#E07A5F] [animation-delay:0.4s]" />
+      <span className="ml-1 text-xs text-gray-400">Menyiapkan jawaban...</span>
+    </div>
+  );
+}
+
+function TopicButton({
+  icon,
+  label,
+  onClick,
+  color,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  color: string;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="group flex w-full cursor-pointer items-center gap-3.5 rounded-2xl border border-gray-200 bg-white p-3.5 text-left shadow-2xs transition-all hover:border-[#E07A5F] hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${color}`}
+      >
+        {icon}
+      </div>
+      <span className="text-xs font-semibold text-gray-800 group-hover:text-[#E07A5F]">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function toUiMessage(message: StoredMessage): Message {
+  return {
+    id: message.id,
+    sender: message.role === "assistant" ? "ai" : "user",
+    text: message.content,
+    sources: message.sources,
+    relatedCare: message.relatedCare,
+    feedback: message.feedback,
+    timestamp: formatTime(new Date(message.createdAt)),
+    persisted: true,
+    persistedId: message.id,
+  };
+}
+
+function updateMessage(
+  messages: Message[],
+  id: string,
+  changes: Partial<Message>,
+) {
+  return messages.map((message) =>
+    message.id === id ? { ...message, ...changes } : message,
+  );
+}
+
+function isStreamMeta(value: unknown): value is StreamMeta {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "sessionId" in value &&
+    typeof value.sessionId === "string" &&
+    "sources" in value &&
+    Array.isArray(value.sources) &&
+    "isEmergency" in value &&
+    typeof value.isEmergency === "boolean" &&
+    (!("relatedCare" in value) ||
+      value.relatedCare === undefined ||
+      isRelatedCareOptions(value.relatedCare)),
+  );
+}
+
+function isRelatedCareOptions(value: unknown): value is RelatedCareOptions {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "reason" in value &&
+    typeof value.reason === "string" &&
+    "disclaimer" in value &&
+    typeof value.disclaimer === "string" &&
+    "products" in value &&
+    Array.isArray(value.products) &&
+    "doctors" in value &&
+    Array.isArray(value.doctors),
+  );
+}
+
+function isStreamToken(value: unknown): value is StreamToken {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "token" in value &&
+    typeof value.token === "string",
+  );
+}
+
+function isStreamCompletion(value: unknown): value is StreamCompletion {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "messageId" in value &&
+    typeof value.messageId === "string",
+  );
+}
+
+function isProviderBlocked(status: ProviderStatusView | null, now: number) {
+  if (!status) return false;
+  if (status.status === "NOT_CONFIGURED") return true;
+  return status.status !== "READY" && (!status.retryAt || status.retryAt > now);
+}
+
+function providerPresentation(status: ProviderStatusView | null, now: number) {
+  if (!status)
+    return {
+      label: "Memeriksa kesiapan layanan...",
+      dotClass: "animate-pulse bg-white/60",
+    };
+  if (status.status === "READY")
+    return { label: "Asisten siap membantu", dotClass: "bg-emerald-300" };
+  if (status.status === "NOT_CONFIGURED") {
+    return { label: "Layanan belum siap", dotClass: "bg-red-300" };
+  }
+
+  const seconds = status.retryAt
+    ? Math.max(0, Math.ceil((status.retryAt - now) / 1_000))
+    : 0;
+  const countdown =
+    seconds > 0 ? ` · coba lagi ${formatCountdown(seconds)}` : "";
+  if (status.status === "RATE_LIMITED") {
+    return {
+      label: `Banyak pengguna sedang bertanya${countdown}`,
+      dotClass: "bg-amber-300",
+    };
+  }
+  return {
+    label: `Asisten sedang tidak tersedia${countdown}`,
+    dotClass: "bg-red-300",
+  };
+}
+
+function updateProviderFromError(
+  error: unknown,
+  update: React.Dispatch<React.SetStateAction<ProviderStatusView | null>>,
+) {
+  if (!(error instanceof ApiError)) return;
+  const retryAfterSeconds = readRetryAfterSeconds(error.details);
+  const status: ProviderState | undefined =
+    error.code === "AI_RATE_LIMITED"
+      ? "RATE_LIMITED"
+      : error.code === "CHATBOT_NOT_CONFIGURED"
+        ? "NOT_CONFIGURED"
+        : error.code.startsWith("AI_")
+          ? "UNAVAILABLE"
+          : undefined;
+  if (!status) return;
+
+  update((current) => ({
+    provider: "9router",
+    model: current?.model ?? "",
+    status,
+    ...(retryAfterSeconds
+      ? { retryAfterSeconds, retryAt: Date.now() + retryAfterSeconds * 1_000 }
+      : {}),
+  }));
+}
+
+function formatCountdown(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function formatTime(date: Date) {
+  return date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function errorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    const retryAfterSeconds = readRetryAfterSeconds(error.details);
+    if (retryAfterSeconds) {
+      return `${error.message} Coba lagi dalam ${formatCountdown(Math.ceil(retryAfterSeconds))}.`;
+    }
+    return error.message;
+  }
+
+  return "GlucoAssistant belum dapat dihubungi. Periksa koneksi internet, lalu coba lagi.";
+}
+
+function readRetryAfterSeconds(details: unknown) {
+  if (
+    !details ||
+    typeof details !== "object" ||
+    !("retryAfterSeconds" in details)
+  ) {
+    return undefined;
+  }
+
+  const value = details.retryAfterSeconds;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
 }

@@ -19,6 +19,171 @@ export interface AdminUser {
 
 export type ChatSessionStatus = "ACTIVE" | "COMPLETED" | "ABANDONED";
 export type LeadQualificationStatus = "ELIGIBLE" | "NEEDS_REVIEW" | "NOT_ELIGIBLE";
+export type ChatFeedbackRating = "HELPFUL" | "NOT_HELPFUL";
+export type ChatFeedbackReason =
+  | "IRRELEVANT"
+  | "UNCLEAR"
+  | "TOO_LONG"
+  | "INCORRECT"
+  | "OTHER";
+
+export interface ChatFeedback {
+  rating: ChatFeedbackRating;
+  reason?: ChatFeedbackReason | null;
+  comment?: string | null;
+  updatedAt: string;
+}
+
+export interface RelatedCareProduct {
+  id: string;
+  slug: string;
+  name: string;
+  category: string;
+  price: number;
+  image: string | null;
+  guidance: string;
+  requiresPrescription: boolean;
+}
+
+export interface RelatedCareDoctor {
+  id: string;
+  slug: string;
+  name: string;
+  specialty: string;
+  experience: string;
+  image: string | null;
+  nextAvailability?: DoctorAvailability;
+}
+
+export type ConsultationMode = "ONLINE" | "OFFLINE";
+export type ScheduleSlotStatus = "AVAILABLE" | "BOOKED" | "BLOCKED";
+export type BookingStatus = "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+export type BookingActorType = "PATIENT" | "ADMIN" | "SYSTEM";
+
+export interface BookingEvent {
+  id: string;
+  bookingId: string;
+  actorType: BookingActorType;
+  actorLabel: string | null;
+  action: string;
+  previousStatus: BookingStatus | null;
+  newStatus: BookingStatus | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface PreConsultationSummary {
+  diabetesType: string | null;
+  currentMedication: string | null;
+  primaryComplaint: string | null;
+  qualificationStatus: string | null;
+  emergencyFlag: boolean;
+  recentPatientMessages: string[];
+  note: string;
+}
+
+export interface DoctorAvailability {
+  slotId: string;
+  mode: ConsultationMode;
+  startsAt: string;
+  endsAt: string;
+  price: number;
+  clinic: Pick<Clinic, "name" | "city"> | null;
+}
+
+export interface Clinic {
+  id: string;
+  slug: string;
+  name: string;
+  city: string;
+  address: string;
+  whatsapp: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScheduleDoctor {
+  id: string;
+  slug: string;
+  name: string;
+  specialty: string;
+  image: string | null;
+}
+
+export interface DoctorScheduleSlot {
+  id: string;
+  doctorId: string;
+  clinicId: string | null;
+  mode: ConsultationMode;
+  startsAt: string;
+  endsAt: string;
+  price: number;
+  status: ScheduleSlotStatus;
+  notes: string | null;
+  doctor?: ScheduleDoctor;
+  clinic: Clinic | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DoctorScheduleResponse {
+  doctor: ScheduleDoctor;
+  slots: DoctorScheduleSlot[];
+}
+
+export interface ConsultationBooking {
+  id: string;
+  bookingCode: string;
+  sessionId: string | null;
+  doctorId: string;
+  slotId: string;
+  patientName: string;
+  whatsapp: string;
+  complaint: string | null;
+  preConsultationSummary: PreConsultationSummary | null;
+  status: BookingStatus;
+  consentAt: string;
+  deletionRequestedAt: string | null;
+  anonymizedAt: string | null;
+  doctor: ScheduleDoctor;
+  slot: DoctorScheduleSlot;
+  events: BookingEvent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsultationStats {
+  totalBookings: number;
+  pending: number;
+  confirmed: number;
+  completed: number;
+  cancelled: number;
+  cancellationRate: number;
+  availableSlots: number;
+  bookedSlots: number;
+  slotFillRate: number;
+  deletionRequests: number;
+  topDoctors: Array<{
+    doctorId: string;
+    name: string;
+    bookingCount: number;
+  }>;
+}
+
+export interface SuggestedReply {
+  id: string;
+  label: string;
+  message: string;
+}
+
+export interface RelatedCareOptions {
+  reason: string;
+  disclaimer: string;
+  products: RelatedCareProduct[];
+  doctors: RelatedCareDoctor[];
+  suggestedReplies?: SuggestedReply[];
+}
 
 export interface AdminChatLead {
   id: string;
@@ -38,6 +203,8 @@ export interface AdminChatSession {
   status: ChatSessionStatus;
   leadCaptured: boolean;
   isEmergency: boolean;
+  consentAt: string | null;
+  consentVersion: string | null;
   expiresAt: string;
   createdAt: string;
   updatedAt: string;
@@ -50,6 +217,18 @@ export interface AdminChatMessage {
   role: "USER" | "ASSISTANT";
   content: string;
   sources: Array<{ title: string; source: string }> | null;
+  modelUsed: string | null;
+  intent: string | null;
+  responseLatencyMs: number | null;
+  gatewayLatencyMs: number | null;
+  gatewayAttempts: number | null;
+  fallbackUsed: boolean | null;
+  retrievalStatus: string | null;
+  retrievalLatencyMs: number | null;
+  retrievalMatchCount: number | null;
+  retrievalTopSimilarity: number | null;
+  feedback: ChatFeedback | null;
+  relatedCare: RelatedCareOptions | null;
   createdAt: string;
 }
 
@@ -64,6 +243,12 @@ export interface AdminChatStats {
   emergency: number;
   captured: number;
   needsReview: number;
+  feedbackHelpful: number;
+  feedbackNotHelpful: number;
+  helpfulRate: number | null;
+  ragErrors: number;
+  fallbackResponses: number;
+  averageResponseLatencyMs: number | null;
 }
 
 export interface Product {
@@ -300,4 +485,3 @@ export interface MealPlanData {
   proPlanPreview: ProPlanPreview;
   generatedAt: string;
 }
-

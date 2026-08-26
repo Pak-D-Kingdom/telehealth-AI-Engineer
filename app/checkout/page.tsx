@@ -12,69 +12,15 @@ import {
   ChevronRight,
   RefreshCw
 } from "lucide-react";
-
-interface CartItem {
-  id: string;
-  name: string;
-  unit: string;
-  price: number;
-  image: string;
-  qty: number;
-}
-
-const CART_KEY = "myskin_cart";
-const CART_CHANGE_EVENT = "telehealth-cart-change";
-const DEFAULT_ITEMS: CartItem[] = [
-  {
-    id: "p1",
-    name: "GlucoMeter Pro Digital Kit",
-    unit: "Digital Kit + 50 Strip",
-    price: 189000,
-    image: "/images/glucometer.png",
-    qty: 1,
-  },
-  {
-    id: "p2",
-    name: "Metformin 500mg Release Control",
-    unit: "Obat Regulasional 30 Tab",
-    price: 45000,
-    image: "/images/metformin.png",
-    qty: 2,
-  },
-];
-
-function subscribeToCart(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener(CART_CHANGE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(CART_CHANGE_EVENT, callback);
-  };
-}
-
-function getCartSnapshot() {
-  return localStorage.getItem(CART_KEY);
-}
-
-function getServerCartSnapshot() {
-  return null;
-}
-
-function parseCart(value: string | null): CartItem[] {
-  if (!value) return DEFAULT_ITEMS;
-
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? (parsed as CartItem[]) : DEFAULT_ITEMS;
-  } catch {
-    return DEFAULT_ITEMS;
-  }
-}
-
-function saveCart(items: CartItem[]) {
-  localStorage.setItem(CART_KEY, JSON.stringify(items));
-  window.dispatchEvent(new Event(CART_CHANGE_EVENT));
-}
+import {
+  CART_CHANGE_EVENT,
+  CART_KEY,
+  getCartSnapshot,
+  getServerCartSnapshot,
+  parseCart,
+  saveCart,
+  subscribeToCart,
+} from "@/lib/cart";
 
 export default function CheckoutPage() {
   const cartSnapshot = useSyncExternalStore(
@@ -141,7 +87,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#132E21] font-sans antialiased selection:bg-[#E07A5F] selection:text-white">
       
-      {/* Header Bar with Official MySkin Logo */}
+      {/* GlucoCare checkout header */}
       <header className="bg-[#132E21] text-white border-b border-[#1E4431]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link
@@ -152,11 +98,11 @@ export default function CheckoutPage() {
             <span>Kembali ke Toko</span>
           </Link>
 
-          {/* Official MySkin Horizontal Logo */}
+          {/* GlucoCare horizontal logo */}
           <div className="relative w-36 h-10 sm:w-44 sm:h-12">
             <Image
               src="/images/logo_horizontal.png"
-              alt="MySkin Logo"
+              alt="GlucoCare Logo"
               fill
               className="object-contain"
               priority
@@ -185,7 +131,7 @@ export default function CheckoutPage() {
               </h1>
             </div>
             <p className="text-xs sm:text-sm text-[#4A5D53]">
-              Lengkapi informasi tujuan pengiriman produk formulasi pilihanmu.
+              Lengkapi informasi tujuan pengiriman produk pilihanmu.
             </p>
           </div>
 
@@ -448,11 +394,11 @@ export default function CheckoutPage() {
                 
                 {/* Header logo in summary */}
                 <div className="flex items-center justify-between border-b border-[#F0ECE6] pb-4">
-                  <h3 className="text-base font-extrabold text-[#132E21]">Rincian Formulasi</h3>
+                  <h3 className="text-base font-extrabold text-[#132E21]">Rincian Pesanan</h3>
                   <div className="relative w-24 h-7">
                     <Image
                       src="/images/logo_horizontal.png"
-                      alt="MySkin"
+                      alt="GlucoCare"
                       fill
                       className="object-contain"
                     />
@@ -476,7 +422,7 @@ export default function CheckoutPage() {
                           {item.name}
                         </h4>
                         <span className="text-[11px] text-[#E07A5F] font-semibold block">
-                          {item.unit}
+                          {item.category || "Produk Medis"}
                         </span>
                         <span className="text-xs font-extrabold text-[#132E21] mt-1 block">
                           {formatRupiah(item.price)}
@@ -562,7 +508,7 @@ export default function CheckoutPage() {
           <div className="relative w-44 h-12 mx-auto">
             <Image
               src="/images/logo_horizontal.png"
-              alt="MySkin Logo"
+              alt="GlucoCare Logo"
               fill
               className="object-contain"
             />
@@ -577,7 +523,7 @@ export default function CheckoutPage() {
               Pembayaran Berhasil!
             </h1>
             <p className="text-sm text-[#4A5D53] max-w-md mx-auto">
-              Pesanan formulasi <strong className="text-[#132E21]">#MSK-894210</strong> telah dikonfirmasi. Tim farmasi kami sedang mengemas pesananmu.
+              Pesanan <strong className="text-[#132E21]">#GLC-894210</strong> telah dikonfirmasi. Tim farmasi kami sedang mengemas pesananmu.
             </p>
           </div>
 
@@ -614,7 +560,7 @@ export default function CheckoutPage() {
           <div className="relative w-44 h-12 mx-auto">
             <Image
               src="/images/logo_horizontal.png"
-              alt="MySkin Logo"
+              alt="GlucoCare Logo"
               fill
               className="object-contain"
             />

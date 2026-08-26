@@ -26,7 +26,7 @@ const EMPTY_FORM: DoctorForm = {
 };
 
 function errorMessage(error: unknown) {
-  return error instanceof ApiError ? error.message : "Operasi dokter gagal diproses.";
+  return error instanceof ApiError ? error.message : "Operasi data dokter gagal diproses.";
 }
 
 export default function AdminDokterPage() {
@@ -140,7 +140,7 @@ export default function AdminDokterPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Dokter Spesialis</h1>
-          <p className="mt-1 text-sm text-[#6B7C72]">Kelola dokter dan bidang keahliannya di PostgreSQL.</p>
+          <p className="mt-1 text-sm text-[#6B7C72]">Kelola dokter spesialis dan bidang keahliannya di database.</p>
         </div>
         <button onClick={openCreate} disabled={categories.length === 0} className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#0D5C46] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#0A4A38] disabled:cursor-not-allowed disabled:opacity-50">
           <Plus className="h-4 w-4" />

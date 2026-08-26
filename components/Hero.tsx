@@ -14,7 +14,7 @@ export default function Hero({ onOpenChat }: HeroProps) {
       title: "Gula Darah Tinggi",
       bg: "bg-[#EAF5EF]",
       image: "/images/card_sugar.png",
-      query: "Gue mau konsultasi keluhan kadar gula darah puasa tinggi dan sering lemas."
+      query: "Saya ingin berkonsultasi tentang keluhan kadar gula darah puasa tinggi dan sering lemas."
     },
     {
       title: "Skrining HbA1c",
@@ -26,7 +26,7 @@ export default function Hero({ onOpenChat }: HeroProps) {
       title: "Dokter Spesialis Sp.PD",
       bg: "bg-[#F5F2EA]",
       image: "/images/card_doctor.png",
-      query: "Gue mau konsul langsung dengan Dokter Spesialis Penyakit Dalam (Sp.PD)."
+      query: "Saya mau konsul langsung dengan Dokter Spesialis Penyakit Dalam (Sp.PD)."
     },
     {
       title: "Luka & Pola Makan",
@@ -61,7 +61,7 @@ export default function Hero({ onOpenChat }: HeroProps) {
         {/* Centered Top Content with Clean Indonesian Copywriting */}
         <div className="text-center max-w-3xl mx-auto space-y-5">
           <p className="text-xs sm:text-sm font-semibold tracking-wide text-white/80">
-            Dipercaya <span className="font-bold text-white">500.000+</span> Pasien Diabetes Indonesia
+            Edukasi diabetes, pencegahan, dan pencatatan keluhan dalam satu platform terpadu
           </p>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.12]">
@@ -71,7 +71,7 @@ export default function Hero({ onOpenChat }: HeroProps) {
           </h1>
 
           <p className="text-sm sm:text-base lg:text-lg text-white/80 max-w-2xl mx-auto font-normal leading-relaxed">
-            Perawatan gula darah & diabetes online — simpel, langsung, dan dipimpin oleh Dokter Spesialis Penyakit Dalam (Sp.PD). Tanpa antrean klinik. Tanpa proses rumit. Hanya penanganan medis yang terbukti efektif.
+            Perawatan gula darah & diabetes online — simpel, langsung, dan dipandu oleh Dokter Spesialis Penyakit Dalam (Sp.PD). Dapatkan edukasi akurat, kenali tanda darurat, dan konsultasi tepat sasaran.
           </p>
         </div>
 

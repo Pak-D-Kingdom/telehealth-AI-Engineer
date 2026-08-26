@@ -19,7 +19,7 @@ export default function TrustBar() {
     },
     {
       icon: CircleDollarSign,
-      text: "HARGA TRANSPARAN & BIASA"
+      text: "HARGA TRANSPARAN & TERJANGKAU"
     }
   ];
 

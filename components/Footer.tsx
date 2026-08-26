@@ -20,14 +20,14 @@ export default function Footer() {
               />
             </div>
             <p className="text-sm text-[#B0C4B8] leading-relaxed max-w-sm">
-              Platform telehealth & konsultasi penyakit gula berbasis AI. Mengontrol kadar gula darah, merekomendasikan obat & alat monitor, serta merujuk ke Dokter Spesialis Penyakit Dalam (Sp.PD).
+              Platform edukasi diabetes dan telehealth dengan asisten AI terintegrasi untuk pemantauan gula darah, panduan nutrisi, dan konsultasi bersama Dokter Spesialis Penyakit Dalam (Sp.PD).
             </p>
           </div>
 
           {/* Nav Col 1 */}
           <div>
             <h4 className="font-bold text-sm text-white mb-4 uppercase tracking-wider">
-              Layanan Telehealth
+              Layanan & Edukasi
             </h4>
             <ul className="space-y-2.5 text-xs text-[#B0C4B8]">
               <li><a href="#gejala" className="hover:text-white transition-colors">Gejala Gula Darah Tinggi</a></li>
@@ -40,15 +40,15 @@ export default function Footer() {
           {/* Nav Col 2 */}
           <div>
             <h4 className="font-bold text-sm text-white mb-4 uppercase tracking-wider">
-              Keamanan Medis
+              Keamanan & Privasi
             </h4>
             <ul className="space-y-2.5 text-xs text-[#B0C4B8]">
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-[#E07A5F]" />
-                <span>Rujukan Sp.PD-KEMD Resmi</span>
+                <span>Rujukan Sp.PD Resmi</span>
               </li>
-              <li>Sesuai Standar Kemenkes RI</li>
-              <li>Privasi Data Medis Terenkripsi</li>
+              <li>Data aman dan terenkripsi</li>
+              <li>Arahan 119/IGD untuk kondisi darurat</li>
             </ul>
           </div>
         </div>

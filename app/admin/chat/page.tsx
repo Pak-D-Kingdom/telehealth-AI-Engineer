@@ -20,10 +20,12 @@ import {
   Package,
   Trash2,
 } from "lucide-react";
-import FormattedMarkdown from "@/components/FormattedMarkdown";
 import { ApiError, apiFetcher, apiRequest } from "@/lib/api-client";
+import MarkdownMessage from "@/components/MarkdownMessage";
+import RelatedCareCards from "@/components/RelatedCareCards";
 import type {
   AdminChatDetail,
+  AdminChatMessage,
   AdminChatSession,
   AdminChatStats,
   ApiResponse,
@@ -59,6 +61,7 @@ export default function AdminChatPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedDraft, setCopiedDraft] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page), limit: "20" });
@@ -119,7 +122,9 @@ export default function AdminChatPage() {
     return map;
   }, [leadScoresResponse]);
 
-  const selectedLeadScore = detail ? (scoreMap.get(detail.id) || (detail.lead?.id ? scoreMap.get(detail.lead.id) : undefined)) : undefined;
+  const selectedLeadScore = detail
+    ? scoreMap.get(detail.id) || (detail.lead?.id ? scoreMap.get(detail.lead.id) : undefined)
+    : undefined;
 
   const updateSession = async (input: {
     status?: ChatSessionStatus;
@@ -145,15 +150,15 @@ export default function AdminChatPage() {
     }
   };
 
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-
   const confirmDeleteSession = async () => {
     if (!deleteTargetId) return;
     setActionError(null);
     setIsSaving(true);
     try {
       await apiRequest(`/api/admin/chat/sessions/${deleteTargetId}`, { method: "DELETE" });
-      setSelectedId(null);
+      if (selectedId === deleteTargetId) {
+        setSelectedId(null);
+      }
       setDeleteTargetId(null);
       await Promise.all([mutateList(), mutateStats()]);
     } catch (error) {
@@ -172,21 +177,47 @@ export default function AdminChatPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">Chat & Lead CRM Intelligence</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-[#0D5C46]">
+          Chat & Lead CRM Intelligence
+        </h1>
         <p className="mt-1 text-sm text-[#6B7C72]">
           Tinjau percakapan chatbot, penilaian prioritas AI Lead Scoring, dan penjangkauan WhatsApp pasien.
         </p>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-        <StatCard label="Total" value={stats?.total} />
+        <StatCard label="Total Percakapan" value={stats?.total} />
         <StatCard label="Aktif" value={stats?.active} />
         <StatCard label="Selesai" value={stats?.completed} />
         <StatCard label="Lead Lengkap" value={stats?.captured} />
-        <StatCard label="Darurat" value={stats?.emergency} tone="danger" />
+        <StatCard label="Kondisi Darurat" value={stats?.emergency} tone="danger" />
         <StatCard label="Perlu Review" value={stats?.needsReview} tone="warning" />
       </div>
 
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard
+          label="Persentase Membantu"
+          value={
+            stats?.helpfulRate === null || stats?.helpfulRate === undefined
+              ? "–"
+              : `${stats.helpfulRate}%`
+          }
+        />
+        <StatCard label="👍 Membantu" value={stats?.feedbackHelpful} />
+        <StatCard label="👎 Tidak membantu" value={stats?.feedbackNotHelpful} tone="warning" />
+        <StatCard label="RAG / Knowledge Errors" value={stats?.ragErrors} tone="danger" />
+        <StatCard
+          label="Rata-rata respons"
+          value={
+            stats?.averageResponseLatencyMs === null || stats?.averageResponseLatencyMs === undefined
+              ? "–"
+              : formatDuration(stats.averageResponseLatencyMs)
+          }
+        />
+      </div>
+
+      {/* Filter Form */}
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -200,7 +231,7 @@ export default function AdminChatPage() {
           <input
             value={searchDraft}
             onChange={(event) => setSearchDraft(event.target.value)}
-            placeholder="Cari nama, WhatsApp, atau isi chat"
+            placeholder="Cari nama, WhatsApp, atau isi percakapan"
             className="min-w-0 flex-1 bg-transparent py-2.5 text-sm outline-none"
           />
           <button
@@ -233,7 +264,7 @@ export default function AdminChatPage() {
           options={[["true", "Darurat"], ["false", "Tidak darurat"]]}
         />
         <FilterSelect
-          label="Semua lead"
+          label="Semua data pasien"
           value={leadCaptured}
           onChange={(value) => {
             setPage(1);
@@ -249,15 +280,20 @@ export default function AdminChatPage() {
         </p>
       )}
 
+      {/* Main Split View */}
       <div className="grid min-h-[560px] overflow-hidden rounded-2xl border border-[#EAE4DC] bg-white lg:grid-cols-[360px_1fr]">
         <section className="border-b border-[#EAE4DC] lg:border-b-0 lg:border-r">
           <div className="border-b border-[#EAE4DC] px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#6B7C72] flex items-center justify-between">
             <span>{meta ? `${meta.total} session` : "Session chatbot"}</span>
-            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">AI Scored</span>
+            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
+              AI Scored
+            </span>
           </div>
           <div className="max-h-[640px] divide-y divide-[#F2ECE4] overflow-y-auto">
             {sessions.map((session) => {
-              const leadScore = scoreMap.get(session.id) || (session.lead?.id ? scoreMap.get(session.lead.id) : undefined);
+              const leadScore =
+                scoreMap.get(session.id) ||
+                (session.lead?.id ? scoreMap.get(session.lead.id) : undefined);
               return (
                 <button
                   key={session.id}
@@ -280,20 +316,30 @@ export default function AdminChatPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {leadScore && <LeadTierBadge tier={leadScore.tier} score={leadScore.totalScore} />}
-                      {session.isEmergency && <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />}
+                      {leadScore && (
+                        <LeadTierBadge tier={leadScore.tier} score={leadScore.totalScore} />
+                      )}
+                      {session.isEmergency && (
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <StatusBadge status={session.status} />
-                    <time className="text-[10px] text-[#8A978F]">{formatDate(session.updatedAt)}</time>
+                    <time className="text-[10px] text-[#8A978F]">
+                      {formatDate(session.updatedAt)}
+                    </time>
                   </div>
                 </button>
               );
             })}
-            {listLoading && <p className="p-8 text-center text-sm text-[#6B7C72]">Memuat session...</p>}
+            {listLoading && (
+              <p className="p-8 text-center text-sm text-[#6B7C72]">Memuat session...</p>
+            )}
             {!listLoading && sessions.length === 0 && (
-              <p className="p-8 text-center text-sm text-[#6B7C72]">Tidak ada session sesuai filter.</p>
+              <p className="p-8 text-center text-sm text-[#6B7C72]">
+                Tidak ada session sesuai filter.
+              </p>
             )}
           </div>
           {meta && meta.totalPages > 1 && (
@@ -307,7 +353,9 @@ export default function AdminChatPage() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-xs font-semibold text-[#6B7C72]">{page} / {meta.totalPages}</span>
+              <span className="text-xs font-semibold text-[#6B7C72]">
+                {page} / {meta.totalPages}
+              </span>
               <button
                 type="button"
                 aria-label="Halaman berikutnya"
@@ -325,14 +373,20 @@ export default function AdminChatPage() {
           {!selectedId && (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center p-8 text-center text-[#6B7C72]">
               <MessageSquareText className="mb-3 h-9 w-9 text-[#0D5C46]/40" />
-              <p className="text-sm font-semibold">Pilih session untuk melihat histori, skor AI, dan data lead.</p>
+              <p className="text-sm font-semibold">
+                Pilih session untuk melihat histori, skor AI, dan data lead.
+              </p>
             </div>
           )}
           {selectedId && detailLoading && (
-            <div className="flex min-h-[420px] items-center justify-center text-sm text-[#6B7C72]">Memuat detail...</div>
+            <div className="flex min-h-[420px] items-center justify-center text-sm text-[#6B7C72]">
+              Memuat detail...
+            </div>
           )}
           {selectedId && detailError && (
-            <p className="m-6 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-600">{detailError.message}</p>
+            <p className="m-6 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-600">
+              {detailError.message}
+            </p>
           )}
           {detail && (
             <div className="flex h-full max-h-[750px] flex-col">
@@ -341,8 +395,14 @@ export default function AdminChatPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <UserRound className="h-4 w-4 text-[#0D5C46]" />
-                      <h2 className="font-bold text-[#1A2421]">{detail.lead?.name || "Pengunjung anonim"}</h2>
-                      {detail.isEmergency && <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">DARURAT</span>}
+                      <h2 className="font-bold text-[#1A2421]">
+                        {detail.lead?.name || "Pengunjung anonim"}
+                      </h2>
+                      {detail.isEmergency && (
+                        <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
+                          DARURAT
+                        </span>
+                      )}
                       {selectedLeadScore && (
                         <span className="text-xs font-bold text-[#0D5C46] bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
                           <Sparkles className="w-3 h-3 text-amber-500" />
@@ -350,27 +410,46 @@ export default function AdminChatPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-[#6B7C72]">Dibuat {formatDate(detail.createdAt)}</p>
+                    <p className="mt-1 text-xs text-[#6B7C72]">
+                      Dibuat {formatDate(detail.createdAt)}
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <select
                       aria-label="Status session"
                       value={detail.status}
                       disabled={isSaving}
-                      onChange={(event) => void updateSession({ status: event.target.value as ChatSessionStatus })}
+                      onChange={(event) =>
+                        void updateSession({
+                          status: event.target.value as ChatSessionStatus,
+                        })
+                      }
                       className="rounded-xl border border-[#EAE4DC] bg-white px-3 py-2 text-xs font-semibold text-[#3A4F46] outline-none"
                     >
-                      {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
                     </select>
                     <select
                       aria-label="Kualifikasi lead"
                       value={detail.lead?.qualificationStatus ?? ""}
                       disabled={isSaving}
-                      onChange={(event) => void updateSession({ qualificationStatus: (event.target.value || null) as LeadQualificationStatus | null })}
+                      onChange={(event) =>
+                        void updateSession({
+                          qualificationStatus:
+                            (event.target.value || null) as LeadQualificationStatus | null,
+                        })
+                      }
                       className="rounded-xl border border-[#EAE4DC] bg-white px-3 py-2 text-xs font-semibold text-[#3A4F46] outline-none"
                     >
                       <option value="">Belum dikualifikasi</option>
-                      {Object.entries(QUALIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      {Object.entries(QUALIFICATION_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
                     </select>
                     <button
                       type="button"
@@ -386,6 +465,14 @@ export default function AdminChatPage() {
                 </div>
 
                 <div className="grid gap-3 rounded-xl bg-[#FAF8F5] p-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <LeadField
+                    label="Persetujuan Data"
+                    value={
+                      detail.consentAt
+                        ? `Disetujui ${formatDate(detail.consentAt)} · v${detail.consentVersion ?? "-"}`
+                        : "Belum disetujui"
+                    }
+                  />
                   <LeadField label="WhatsApp" value={detail.lead?.whatsapp} />
                   <LeadField label="Tipe Diabetes" value={detail.lead?.diabetesType} />
                   <LeadField label="Obat Saat Ini" value={detail.lead?.currentMedication} />
@@ -410,11 +497,13 @@ export default function AdminChatPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                       <div className="flex items-center gap-1.5 text-[#3A4F46]">
                         <Stethoscope className="w-3.5 h-3.5 text-[#0D5C46] shrink-0" />
-                        <span className="font-bold">Rujukan:</span> {selectedLeadScore.recommendedSpecialist}
+                        <span className="font-bold">Rujukan:</span>{" "}
+                        {selectedLeadScore.recommendedSpecialist}
                       </div>
                       <div className="flex items-center gap-1.5 text-[#3A4F46]">
                         <Package className="w-3.5 h-3.5 text-[#E07A5F] shrink-0" />
-                        <span className="font-bold">Produk:</span> {selectedLeadScore.recommendedProducts.join(", ")}
+                        <span className="font-bold">Produk:</span>{" "}
+                        {selectedLeadScore.recommendedProducts.join(", ")}
                       </div>
                     </div>
 
@@ -422,7 +511,7 @@ export default function AdminChatPage() {
                     <div className="pt-2 border-t border-[#0D5C46]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] font-semibold text-[#4A5D53] line-clamp-2 italic bg-white p-2 rounded-lg border border-[#EAE4DC]">
-                          "{selectedLeadScore.whatsAppDraft}"
+                          &quot;{selectedLeadScore.whatsAppDraft}&quot;
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -459,20 +548,56 @@ export default function AdminChatPage() {
 
               <div className="flex-1 space-y-4 overflow-y-auto bg-[#FCFBF9] p-5">
                 {detail.messages.map((message) => (
-                  <div key={message.id} className={message.role === "USER" ? "flex justify-end" : "flex justify-start"}>
-                    <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === "USER" ? "rounded-tr-sm bg-[#0D5C46] text-white" : "rounded-tl-sm border border-[#EAE4DC] bg-white text-[#1A2421]"}`}>
-                      <FormattedMarkdown content={message.content} isUser={message.role === "USER"} />
+                  <div
+                    key={message.id}
+                    className={
+                      message.role === "USER" ? "flex justify-end" : "flex justify-start"
+                    }
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                        message.role === "USER"
+                          ? "rounded-tr-sm bg-[#0D5C46] text-white"
+                          : "rounded-tl-sm border border-[#EAE4DC] bg-white text-[#1A2421]"
+                      }`}
+                    >
+                      <MarkdownMessage
+                        variant={message.role === "USER" ? "inverse" : "default"}
+                      >
+                        {message.content}
+                      </MarkdownMessage>
+                      {message.relatedCare && (
+                        <RelatedCareCards options={message.relatedCare} />
+                      )}
                       {message.sources && message.sources.length > 0 && (
                         <p className="mt-2 border-t border-[#EAE4DC] pt-2 text-[10px] text-[#6B7C72]">
                           Sumber: {message.sources.map((source) => source.title).join(", ")}
                         </p>
                       )}
-                      <time className={`mt-2 block text-[9px] ${message.role === "USER" ? "text-white/60" : "text-[#8A978F]"}`}>{formatDate(message.createdAt)}</time>
+                      {message.modelUsed && (
+                        <p
+                          className={`mt-2 text-[9px] ${
+                            message.role === "USER" ? "text-white/60" : "text-[#8A978F]"
+                          }`}
+                        >
+                          Mesin jawaban: {message.modelUsed}
+                        </p>
+                      )}
+                      {message.role === "ASSISTANT" && <MessageQuality message={message} />}
+                      <time
+                        className={`mt-2 block text-[9px] ${
+                          message.role === "USER" ? "text-white/60" : "text-[#8A978F]"
+                        }`}
+                      >
+                        {formatDate(message.createdAt)}
+                      </time>
                     </div>
                   </div>
                 ))}
                 {detail.messageCount > detail.messages.length && (
-                  <p className="text-center text-xs text-[#8A978F]">Menampilkan 200 pesan pertama dari {detail.messageCount} pesan.</p>
+                  <p className="text-center text-xs text-[#8A978F]">
+                    Menampilkan 200 pesan pertama dari {detail.messageCount} pesan.
+                  </p>
                 )}
               </div>
             </div>
@@ -546,28 +671,113 @@ function LeadTierBadge({ tier, score }: { tier: "HOT" | "WARM" | "COLD"; score: 
   );
 }
 
-function StatCard({ label, value, tone = "default" }: { label: string; value?: number; tone?: "default" | "danger" | "warning" }) {
-  const toneClass = tone === "danger" ? "text-red-600" : tone === "warning" ? "text-amber-700" : "text-[#0D5C46]";
+function StatCard({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value?: React.ReactNode;
+  tone?: "default" | "danger" | "warning";
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "text-red-600"
+      : tone === "warning"
+        ? "text-amber-700"
+        : "text-[#0D5C46]";
   return (
     <div className="rounded-2xl border border-[#EAE4DC] bg-white p-4">
       <p className={`text-2xl font-extrabold ${toneClass}`}>{value ?? "…"}</p>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#6B7C72]">{label}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#6B7C72]">
+        {label}
+      </p>
     </div>
   );
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[][]; onChange: (value: string) => void }) {
+function MessageQuality({ message }: { message: AdminChatMessage }) {
+  const metrics = [
+    message.intent ? `Topik ${intentLabel(message.intent)}` : undefined,
+    message.responseLatencyMs !== null
+      ? `Waktu jawaban ${formatDuration(message.responseLatencyMs)}`
+      : undefined,
+    message.gatewayLatencyMs !== null
+      ? `Waktu layanan AI ${formatDuration(message.gatewayLatencyMs)}`
+      : undefined,
+    message.gatewayAttempts !== null
+      ? `${message.gatewayAttempts} kali mencoba${
+          message.fallbackUsed ? " · memakai layanan cadangan" : ""
+        }`
+      : undefined,
+    message.retrievalStatus
+      ? `Sumber jawaban ${retrievalStatusLabel(message.retrievalStatus)} · ${
+          message.retrievalMatchCount ?? 0
+        } hasil`
+      : undefined,
+    message.retrievalTopSimilarity !== null
+      ? `Kecocokan sumber tertinggi ${Math.round(message.retrievalTopSimilarity * 100)}%`
+      : undefined,
+  ].filter(Boolean);
+
+  if (metrics.length === 0 && !message.feedback) return null;
+
   return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#EAE4DC] bg-white px-3 py-2.5 text-sm text-[#3A4F46] outline-none">
+    <div className="mt-2 space-y-1 border-t border-[#EAE4DC] pt-2 text-[9px] text-[#6B7C72]">
+      {metrics.length > 0 && <p>{metrics.join(" · ")}</p>}
+      {message.feedback && (
+        <p
+          className={`font-bold ${
+            message.feedback.rating === "HELPFUL" ? "text-emerald-700" : "text-red-600"
+          }`}
+        >
+          Penilaian: {message.feedback.rating === "HELPFUL" ? "Membantu" : "Tidak membantu"}
+          {message.feedback.reason ? ` · ${feedbackReasonLabel(message.feedback.reason)}` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[][];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="rounded-xl border border-[#EAE4DC] bg-white px-3 py-2.5 text-sm text-[#3A4F46] outline-none"
+    >
       <option value="">{label}</option>
-      {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
+      {options.map(([optionValue, optionLabel]) => (
+        <option key={optionValue} value={optionValue}>
+          {optionLabel}
+        </option>
+      ))}
     </select>
   );
 }
 
 function StatusBadge({ status }: { status: ChatSessionStatus }) {
-  const className = status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : status === "COMPLETED" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500";
-  return <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${className}`}>{STATUS_LABELS[status]}</span>;
+  const className =
+    status === "ACTIVE"
+      ? "bg-emerald-50 text-emerald-700"
+      : status === "COMPLETED"
+        ? "bg-blue-50 text-blue-700"
+        : "bg-gray-100 text-gray-500";
+  return (
+    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${className}`}>
+      {STATUS_LABELS[status]}
+    </span>
+  );
 }
 
 function LeadField({ label, value }: { label: string; value?: string | null }) {
@@ -584,4 +794,47 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatDuration(milliseconds: number) {
+  return milliseconds < 1_000
+    ? `${milliseconds} ms`
+    : `${(milliseconds / 1_000).toFixed(1)} dtk`;
+}
+
+function intentLabel(intent: string) {
+  return (
+    ({
+      EMERGENCY: "Darurat",
+      CARE_RECOMMENDATION: "Pilihan produk atau dokter",
+      MEDICATION_INFORMATION: "Informasi obat",
+      GLUCOSE_MONITORING: "Pemantauan gula darah",
+      LIFESTYLE_EDUCATION: "Pola hidup",
+      DIABETES_EDUCATION: "Edukasi diabetes",
+      GENERAL: "Pertanyaan umum",
+    } as Record<string, string>)[intent] ?? intent
+  );
+}
+
+function retrievalStatusLabel(status: string) {
+  return (
+    ({
+      SUCCESS: "tersedia",
+      NOT_CONFIGURED: "belum diaktifkan",
+      ERROR: "bermasalah",
+      SKIPPED: "tidak diperlukan",
+    } as Record<string, string>)[status] ?? status.toLocaleLowerCase("id-ID")
+  );
+}
+
+function feedbackReasonLabel(reason: string) {
+  return (
+    ({
+      IRRELEVANT: "Tidak relevan",
+      UNCLEAR: "Tidak jelas",
+      TOO_LONG: "Terlalu panjang",
+      INCORRECT: "Informasi salah",
+      OTHER: "Lainnya",
+    } as Record<string, string>)[reason] ?? reason
+  );
 }
