@@ -18,6 +18,7 @@ import {
   Check,
   Stethoscope,
   Package,
+  Trash2,
 } from "lucide-react";
 import FormattedMarkdown from "@/components/FormattedMarkdown";
 import { ApiError, apiFetcher, apiRequest } from "@/lib/api-client";
@@ -139,6 +140,24 @@ export default function AdminChatPage() {
       ]);
     } catch (error) {
       setActionError(error instanceof ApiError ? error.message : "Perubahan gagal disimpan.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const confirmDeleteSession = async () => {
+    if (!deleteTargetId) return;
+    setActionError(null);
+    setIsSaving(true);
+    try {
+      await apiRequest(`/api/admin/chat/sessions/${deleteTargetId}`, { method: "DELETE" });
+      setSelectedId(null);
+      setDeleteTargetId(null);
+      await Promise.all([mutateList(), mutateStats()]);
+    } catch (error) {
+      setActionError(error instanceof ApiError ? error.message : "Gagal menghapus session chat.");
     } finally {
       setIsSaving(false);
     }
@@ -353,6 +372,16 @@ export default function AdminChatPage() {
                       <option value="">Belum dikualifikasi</option>
                       {Object.entries(QUALIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
+                    <button
+                      type="button"
+                      title="Hapus session chat ini"
+                      disabled={isSaving}
+                      onClick={() => setDeleteTargetId(detail.id)}
+                      className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 disabled:opacity-50 px-3 py-2 text-xs font-bold text-red-600 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Hapus Chat</span>
+                    </button>
                   </div>
                 </div>
 
@@ -450,6 +479,47 @@ export default function AdminChatPage() {
           )}
         </section>
       </div>
+
+      {/* Modern Confirmation Modal Popup */}
+      {deleteTargetId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl border border-[#EAE4DC] bg-white p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600 border border-red-100">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-[#1A2421]">Hapus Percakapan Ini?</h3>
+                <p className="text-xs text-[#6B7C72]">Tindakan ini permanen</p>
+              </div>
+            </div>
+
+            <p className="text-xs leading-relaxed text-[#5A6E63]">
+              Seluruh riwayat pesan, data lead pasien, dan ringkasan percakapan dari sesi ini akan dihapus secara permanen dari database.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#F2ECE4]">
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => setDeleteTargetId(null)}
+                className="cursor-pointer rounded-xl border border-[#EAE4DC] bg-white px-4 py-2.5 text-xs font-bold text-[#3A4F46] hover:bg-[#FAF8F5] transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => void confirmDeleteSession()}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{isSaving ? "Menghapus..." : "Ya, Hapus Chat"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

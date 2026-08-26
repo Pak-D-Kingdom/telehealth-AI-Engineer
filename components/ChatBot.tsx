@@ -16,6 +16,7 @@ import {
   Trash2,
   Scale,
   MessageCircle,
+  RotateCcw,
 } from "lucide-react";
 import FormattedMarkdown from "./FormattedMarkdown";
 
@@ -134,8 +135,28 @@ export default function ChatBot({
     }
   }, []);
 
+  const [showResetModal, setShowResetModal] = useState(false);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const executeResetChat = async () => {
+    try {
+      await fetch(`${AI_AGENT_URL}/api/chat`, { method: "DELETE" });
+    } catch (e) {
+      console.warn("Gagal mereset session di backend:", e);
+    }
+
+    setMessages([]);
+    setInput("");
+    setSelectedImages([]);
+    setCart({});
+    latestFoodContextRef.current = "";
+
+    const newId = "session-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem("gluco_chat_session_id", newId);
+    setSessionId(newId);
   };
 
   useEffect(() => {
@@ -607,7 +628,19 @@ export default function ChatBot({
               </span>
             </div>
 
-            <div className="w-8" />
+            <button
+              type="button"
+              onClick={() => setShowResetModal(true)}
+              title="Reset / Hapus Percakapan"
+              disabled={messages.length === 0}
+              className={`w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white transition-all cursor-pointer ${
+                messages.length === 0
+                  ? "opacity-30 cursor-not-allowed"
+                  : "hover:bg-red-500/80 hover:text-white"
+              }`}
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto space-y-6 bg-white">
@@ -1039,6 +1072,44 @@ export default function ChatBot({
             </form>
             <div className="text-[9px] text-gray-400 pl-4">{input.length}/500</div>
           </div>
+
+          {/* Modern Reset Modal Popup inside ChatBot */}
+          {showResetModal && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+              <div className="w-full max-w-[280px] rounded-3xl border border-[#EAE4DC] bg-white p-5 shadow-2xl space-y-3 animate-in zoom-in-95 duration-200 text-center">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
+                  <RotateCcw className="h-5 w-5" />
+                </div>
+                
+                <div className="space-y-1">
+                  <h3 className="text-sm font-extrabold text-[#0D5C46]">Reset Percakapan?</h3>
+                  <p className="text-xs text-[#6B7C72] leading-relaxed">
+                    Riwayat pesan akan dihapus dan Anda akan memulai konsultasi baru.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetModal(false)}
+                    className="cursor-pointer flex-1 rounded-xl border border-[#EAE4DC] bg-white py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowResetModal(false);
+                      await executeResetChat();
+                    }}
+                    className="cursor-pointer flex-1 rounded-xl bg-[#0D5C46] hover:bg-[#094232] py-2 text-xs font-bold text-white shadow-sm transition-colors"
+                  >
+                    Ya, Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
