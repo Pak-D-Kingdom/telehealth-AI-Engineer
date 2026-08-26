@@ -14,7 +14,14 @@ describe("conversation state", () => {
         diabetesType: "Tipe 2",
       }),
     ).toBe(true);
-    expect(isLeadComplete({ name: "Budi", whatsapp: "081234567890" })).toBe(true);
+    expect(
+      isLeadComplete({
+        name: "Budi",
+        whatsapp: "081234567890",
+        diabetesType: "Tipe 2",
+      }),
+    ).toBe(true);
+    expect(isLeadComplete({ name: "Budi", whatsapp: "081234567890" })).toBe(false);
     expect(isLeadComplete({ name: "Budi" })).toBe(false);
   });
 
