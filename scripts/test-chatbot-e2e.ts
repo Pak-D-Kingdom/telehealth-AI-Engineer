@@ -15,10 +15,17 @@ interface ApiEnvelope<T> {
 }
 
 interface ChatReply {
+  messageId?: string;
   sessionId: string;
   reply: string;
   leadComplete: boolean;
   isEmergency: boolean;
+  relatedCare?: {
+    disclaimer: string;
+    products: Array<{ name: string; requiresPrescription: boolean }>;
+    doctors: Array<{ name: string }>;
+    suggestedReplies: Array<{ id: string; label: string; message: string }>;
+  };
 }
 
 interface ChatHistory {
@@ -55,7 +62,7 @@ async function main() {
   assert.equal(ragResult.status, 200);
   assert.equal(ragResult.body.data.isEmergency, false);
   assert.match(ragResult.body.data.reply, /HbA1c|hemoglobin|gula darah/i);
-  console.log("✓ Groq menjawab pertanyaan menggunakan konteks edukasi HbA1c");
+  console.log("✓ AI menjawab pertanyaan menggunakan konteks edukasi HbA1c");
 
   const history = await getHistory(baseUrl, primaryCookie);
   assert.equal(history.status, 200);
@@ -126,7 +133,7 @@ async function sendChat(baseUrl: string, message: string, cookie = "", attempt =
       "Content-Type": "application/json",
       ...(cookie ? { Cookie: cookie } : {}),
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, consentToDataProcessing: true }),
   });
   const body = (await response.json()) as ApiEnvelope<ChatReply>;
   const responseCookie = response.headers.get("set-cookie")?.split(";", 1)[0] ?? cookie;
@@ -152,7 +159,7 @@ async function sendChat(baseUrl: string, message: string, cookie = "", attempt =
         await prisma.chatSession.deleteMany({ where: { id: failedSessionId } });
         createdSessionIds.delete(failedSessionId);
       }
-      console.log(`↻ Menunggu ${retryAfterSeconds + 1} detik sesuai Retry-After Groq`);
+      console.log(`↻ Menunggu ${retryAfterSeconds + 1} detik sesuai Retry-After`);
       await Bun.sleep((retryAfterSeconds + 1) * 1_000);
       return sendChat(baseUrl, message, cookie, attempt + 1);
     }

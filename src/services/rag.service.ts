@@ -11,10 +11,10 @@ const geminiEmbeddingSchema = z.object({
   }),
 });
 
-const geminiErrorSchema = z.object({
-  error: z.object({
-    details: z.array(z.object({ reason: z.string().optional() }).passthrough()).optional(),
-  }),
+const embeddingResponseSchema = z.object({
+  data: z.array(z.object({
+    embedding: z.array(z.number().finite()).length(EMBEDDING_DIMENSIONS),
+  })).min(1),
 });
 
 interface KnowledgeMatch {
@@ -24,86 +24,120 @@ interface KnowledgeMatch {
   similarity: number;
 }
 
+export type RetrievalStatus = "SUCCESS" | "NOT_CONFIGURED" | "ERROR";
+
+export interface RetrievalMetrics {
+  status: RetrievalStatus;
+  latencyMs: number;
+  matchCount: number;
+  topSimilarity?: number;
+}
+
+export interface RetrievalResult {
+  references: KnowledgeMatch[];
+  metrics: RetrievalMetrics;
+}
+
 interface EmbeddingOptions {
   taskType?: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY";
   title?: string;
 }
 
 export async function generateEmbedding(text: string, options: EmbeddingOptions = {}) {
-  if (!env.GEMINI_API_KEY) {
-    throw new AppError(
-      503,
-      "EMBEDDING_NOT_CONFIGURED",
-      "Layanan knowledge base belum dikonfigurasi.",
-    );
-  }
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), env.AI_REQUEST_TIMEOUT_MS);
-  const model = encodeURIComponent(env.GEMINI_EMBEDDING_MODEL);
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent`,
-      {
+  // 1. Try Gemini Embedding if key present
+  if (env.GEMINI_API_KEY) {
+    try {
+      const model = encodeURIComponent(env.GEMINI_EMBEDDING_MODEL);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": env.GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            model: `models/${env.GEMINI_EMBEDDING_MODEL}`,
+            content: { parts: [{ text: text.replace(/\s+/g, " ").trim() }] },
+            embedContentConfig: {
+              outputDimensionality: EMBEDDING_DIMENSIONS,
+              ...(options.taskType ? { taskType: options.taskType } : {}),
+              ...(options.title ? { title: options.title } : {}),
+            },
+          }),
+          signal: controller.signal,
+        },
+      );
+
+      if (response.ok) {
+        const result = geminiEmbeddingSchema.safeParse(await response.json());
+        if (result.success) {
+          clearTimeout(timeout);
+          return result.data.embedding.values;
+        }
+      }
+    } catch (err) {
+      console.warn("[RAG] Gemini embedding failed, attempting gateway fallback...", err);
+    }
+  }
+
+  // 2. Gateway fallback
+  if (env.AI_GATEWAY_API_KEY && env.AI_EMBEDDING_MODEL) {
+    try {
+      const response = await fetch(`${env.AI_GATEWAY_BASE_URL}/embeddings`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": env.GEMINI_API_KEY,
+          Authorization: `Bearer ${env.AI_GATEWAY_API_KEY}`,
         },
         body: JSON.stringify({
-          model: `models/${env.GEMINI_EMBEDDING_MODEL}`,
-          content: { parts: [{ text: text.replace(/\s+/g, " ").trim() }] },
-          embedContentConfig: {
-            outputDimensionality: EMBEDDING_DIMENSIONS,
-            ...(options.taskType ? { taskType: options.taskType } : {}),
-            ...(options.title ? { title: options.title } : {}),
-          },
+          model: env.AI_EMBEDDING_MODEL,
+          input: text.replace(/\s+/g, " ").trim(),
+          dimensions: EMBEDDING_DIMENSIONS,
+          encoding_format: "float",
         }),
         signal: controller.signal,
-      },
-    );
+      });
 
-    if (!response.ok) {
-      const errorBody = geminiErrorSchema.safeParse(await response.json().catch(() => undefined));
-      const providerReason = errorBody.success
-        ? errorBody.data.error.details?.find((detail) => detail.reason)?.reason
-        : undefined;
-      console.error(
-        `Gemini embedding API gagal dengan status ${response.status}${providerReason ? ` (${providerReason})` : ""}.`,
-      );
-
-      if (response.status === 401) {
-        throw new AppError(
-          502,
-          "GEMINI_AUTH_ERROR",
-          "Gemini menolak GEMINI_API_KEY. Periksa status dan binding key di Google AI Studio.",
-          providerReason ? { providerReason } : undefined,
-        );
+      if (response.ok) {
+        const result = embeddingResponseSchema.safeParse(await response.json());
+        if (result.success) {
+          clearTimeout(timeout);
+          return result.data.data[0]!.embedding;
+        }
       }
-
-      throw new AppError(502, "EMBEDDING_PROVIDER_ERROR", "Gagal membuat embedding.");
+    } catch (err) {
+      console.warn("[RAG] Gateway embedding failed:", err);
     }
-
-    const result = geminiEmbeddingSchema.safeParse(await response.json());
-    if (!result.success) {
-      throw new AppError(502, "INVALID_EMBEDDING_RESPONSE", "Embedding tidak valid.");
-    }
-
-    return result.data.embedding.values;
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new AppError(504, "EMBEDDING_TIMEOUT", "Layanan embedding terlalu lama merespons.");
-    }
-    throw new AppError(502, "EMBEDDING_PROVIDER_ERROR", "Gagal membuat embedding.");
-  } finally {
-    clearTimeout(timeout);
   }
+
+  clearTimeout(timeout);
+  throw new AppError(503, "EMBEDDING_NOT_CONFIGURED", "Layanan knowledge base belum dikonfigurasi.");
 }
 
 export async function retrieveRelevantContext(query: string, limit = 4) {
-  if (!env.GEMINI_API_KEY) return [];
+  const result = await retrieveRelevantContextWithMetrics(query, limit);
+  return result.references;
+}
+
+export async function retrieveRelevantContextWithMetrics(
+  query: string,
+  limit = 4,
+): Promise<RetrievalResult> {
+  const startedAt = Date.now();
+  if (!env.GEMINI_API_KEY && (!env.AI_GATEWAY_API_KEY || !env.AI_EMBEDDING_MODEL)) {
+    return {
+      references: [],
+      metrics: {
+        status: "NOT_CONFIGURED",
+        latencyMs: Date.now() - startedAt,
+        matchCount: 0,
+      },
+    };
+  }
 
   try {
     const embedding = await generateEmbedding(query, { taskType: "RETRIEVAL_QUERY" });
@@ -153,10 +187,30 @@ export async function retrieveRelevantContext(query: string, limit = 4) {
       LIMIT ${limit}
     `;
 
-    return matches.map(({ title, content, source }) => ({ title, content, source }));
+    return {
+      references: matches.map(({ title, content, source, similarity }) => ({
+        title,
+        content,
+        source,
+        similarity,
+      })),
+      metrics: {
+        status: "SUCCESS",
+        latencyMs: Date.now() - startedAt,
+        matchCount: matches.length,
+        ...(matches[0] ? { topSimilarity: matches[0].similarity } : {}),
+      },
+    };
   } catch (error) {
     console.error("RAG tidak tersedia; percakapan dilanjutkan tanpa konteks.", error);
-    return [];
+    return {
+      references: [],
+      metrics: {
+        status: "ERROR",
+        latencyMs: Date.now() - startedAt,
+        matchCount: 0,
+      },
+    };
   }
 }
 

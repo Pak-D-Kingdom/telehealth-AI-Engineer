@@ -12,10 +12,26 @@ const prisma = new PrismaClient({
 });
 
 const categories = [
-  { id: "diabetes2", name: "Diabetes Tipe 2" },
-  { id: "ulkus", name: "Luka Diabetes (Ulkus)" },
-  { id: "insulin", name: "Sensitivitas Insulin" },
-  { id: "gestational", name: "Diabetes Gestasional" },
+  {
+    id: "diabetes2",
+    name: "Diabetes Tipe 2",
+    description: "Dokter untuk edukasi, evaluasi, dan tindak lanjut diabetes tipe 2.",
+  },
+  {
+    id: "ulkus",
+    name: "Luka Diabetes (Ulkus)",
+    description: "Dokter untuk penilaian luka kaki diabetes dan risiko komplikasi vaskular.",
+  },
+  {
+    id: "insulin",
+    name: "Sensitivitas Insulin & Metabolik",
+    description: "Dokter untuk evaluasi terapi insulin dan gangguan endokrin-metabolik.",
+  },
+  {
+    id: "gestational",
+    name: "Diabetes Gestasional",
+    description: "Dokter untuk pemantauan diabetes dalam kehamilan dan kesehatan ibu-janin.",
+  },
 ];
 
 const products = [
@@ -59,6 +75,106 @@ const products = [
     description:
       "Gel perawatan luka diabetes yang digunakan sesuai petunjuk tenaga medis.",
   },
+  {
+    slug: "glucocare-smartcheck-strip-50",
+    name: "GlucoCare SmartCheck Strip 50",
+    category: "Strip Tes Gula Darah",
+    price: 132000,
+    image: "/images/glucometer.png",
+    specs: "Isi 50 Strip • Sampel 0,6 µL • Kemasan Individual • Produk Demo",
+    description:
+      "Strip tes simulasi untuk alat cek gula darah yang kompatibel. Harga dan kompatibilitas wajib dikonfirmasi sebelum penggunaan.",
+  },
+  {
+    slug: "glucocare-softtouch-lancet-100",
+    name: "GlucoCare SoftTouch Lancet 100",
+    category: "Lancet Steril Sekali Pakai",
+    price: 49500,
+    image: "/images/glucometer.png",
+    specs: "Isi 100 • 30G • Steril • Sekali Pakai • Produk Demo",
+    description:
+      "Lancet simulasi untuk pengambilan sampel darah kapiler. Jangan menggunakan ulang lancet yang telah dipakai.",
+  },
+  {
+    slug: "insufine-pen-needle-4mm-100",
+    name: "InsuFine Pen Needle 4 mm 100",
+    category: "Jarum Pena Insulin",
+    price: 169000,
+    image: "/images/metformin.png",
+    specs: "4 mm • 32G • Isi 100 • Steril • Produk Demo",
+    description:
+      "Jarum pena insulin simulasi. Ukuran dan teknik penyuntikan harus disesuaikan berdasarkan edukasi tenaga medis.",
+  },
+  {
+    slug: "ketocheck-blood-ketone-strip-10",
+    name: "KetoCheck Blood Ketone Strip 10",
+    category: "Strip Tes Keton Darah",
+    price: 185000,
+    image: "/images/glucometer.png",
+    specs: "Isi 10 Strip • Kemasan Individual • Produk Demo",
+    description:
+      "Strip keton darah simulasi untuk perangkat yang kompatibel. Hasil tinggi atau gejala berat memerlukan penilaian medis segera.",
+  },
+  {
+    slug: "glucoderm-hydrocolloid-dressing-10x10",
+    name: "GlucoDerm Hydrocolloid Dressing 10x10 cm",
+    category: "Balutan Luka Diabetes",
+    price: 148000,
+    image: "/images/ulcer_gel.png",
+    specs: "10x10 cm • Isi 5 • Steril • Produk Demo",
+    description:
+      "Balutan hidrokoloid simulasi untuk perawatan luka. Luka diabetes harus dinilai tenaga medis sebelum memilih jenis balutan.",
+  },
+  {
+    slug: "glucofoot-urea-10-cream",
+    name: "GlucoFoot Urea 10% Moisturizing Cream",
+    category: "Perawatan Kulit Kaki Diabetes",
+    price: 96000,
+    image: "/images/ulcer_gel.png",
+    specs: "Urea 10% • 100 g • Tanpa Pewangi • Produk Demo",
+    description:
+      "Krim pelembap simulasi untuk kulit kaki kering. Tidak digunakan pada luka terbuka atau jaringan yang terinfeksi.",
+  },
+  {
+    slug: "glucobalance-low-gi-vanilla-400g",
+    name: "GlucoBalance Low GI Vanilla 400 g",
+    category: "Nutrisi Rendah Indeks Glikemik",
+    price: 178000,
+    image: "/images/cinnamon_herbal.png",
+    specs: "400 g • Rasa Vanila • Serat Pangan • Produk Demo",
+    description:
+      "Produk nutrisi simulasi, bukan pengganti pola makan seimbang atau terapi. Kebutuhan nutrisi perlu disesuaikan secara individual.",
+  },
+  {
+    slug: "glimepiride-2mg-glycemic-control-demo",
+    name: "Glimepiride 2 mg Glycemic Control (Demo)",
+    category: "Obat Resep Antidiabetes",
+    price: 72000,
+    image: "/images/metformin.png",
+    specs: "Glimepiride 2 mg • Tablet • Obat Keras • Produk Demo",
+    description:
+      "Data produk simulasi. Penggunaan hanya berdasarkan resep, evaluasi risiko hipoglikemia, dan pengawasan dokter.",
+  },
+  {
+    slug: "acarbose-50mg-post-meal-control-demo",
+    name: "Acarbose 50 mg Post Meal Control (Demo)",
+    category: "Obat Resep Antidiabetes",
+    price: 86000,
+    image: "/images/metformin.png",
+    specs: "Acarbose 50 mg • Tablet • Obat Keras • Produk Demo",
+    description:
+      "Data produk simulasi. Kecocokan, dosis, kontraindikasi, dan waktu penggunaan harus ditentukan dokter.",
+  },
+  {
+    slug: "glucocare-alcohol-swab-100",
+    name: "GlucoCare Alcohol Swab 100",
+    category: "Perlengkapan Cek Gula Darah",
+    price: 39000,
+    image: "/images/glucometer.png",
+    specs: "Isopropyl Alcohol 70% • Isi 100 • Sekali Pakai • Produk Demo",
+    description:
+      "Kapas alkohol simulasi untuk kebersihan kulit sebelum tindakan sesuai petunjuk tenaga kesehatan.",
+  },
 ];
 
 const doctors = [
@@ -98,7 +214,109 @@ const doctors = [
     image: "/images/doctor_4.png",
     categoryIds: ["gestational", "insulin"],
   },
+  {
+    slug: "dr-nadia-putri-demo",
+    name: "dr. Nadia Putri, Sp.PD-KEMD",
+    specialty: "Konsultan Endokrin, Metabolik & Diabetes • Profil Demo",
+    experience: "11 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-005",
+    image: "/images/doctor_1.png",
+    categoryIds: ["diabetes2", "insulin"],
+  },
+  {
+    slug: "dr-rizky-mahendra-demo",
+    name: "dr. Rizky Mahendra, Sp.PD-KEMD",
+    specialty: "Diabetes Tipe 2 Kompleks & Terapi Insulin • Profil Demo",
+    experience: "13 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-006",
+    image: "/images/doctor_2.png",
+    categoryIds: ["diabetes2", "insulin"],
+  },
+  {
+    slug: "dr-citra-lestari-demo",
+    name: "dr. Citra Lestari, Sp.OG, Subsp.KFm",
+    specialty: "Obstetri Fetomaternal & Diabetes Gestasional • Profil Demo",
+    experience: "12 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-007",
+    image: "/images/doctor_4.png",
+    categoryIds: ["gestational"],
+  },
+  {
+    slug: "dr-bagas-arya-demo",
+    name: "dr. Bagas Arya, Sp.B, Subsp.BVE(K)",
+    specialty: "Bedah Vaskular & Luka Kaki Diabetes • Profil Demo",
+    experience: "15 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-008",
+    image: "/images/doctor_3.png",
+    categoryIds: ["ulkus"],
+  },
+  {
+    slug: "dr-laila-nuraini-demo",
+    name: "dr. Laila Nuraini, Sp.GK",
+    specialty: "Gizi Klinik untuk Diabetes & Kehamilan • Profil Demo",
+    experience: "9 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-009",
+    image: "/images/doctor_2.png",
+    categoryIds: ["diabetes2", "gestational"],
+  },
+  {
+    slug: "dr-fajar-nugroho-demo",
+    name: "dr. Fajar Nugroho, Sp.PD",
+    specialty: "Penyakit Dalam & Kontrol Diabetes Tipe 2 • Profil Demo",
+    experience: "8 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-010",
+    image: "/images/doctor_1.png",
+    categoryIds: ["diabetes2"],
+  },
+  {
+    slug: "dr-intan-maharani-demo",
+    name: "dr. Intan Maharani, Sp.PD-KEMD",
+    specialty: "Endokrin-Metabolik & Edukasi Insulin • Profil Demo",
+    experience: "10 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-011",
+    image: "/images/doctor_4.png",
+    categoryIds: ["insulin", "diabetes2"],
+  },
+  {
+    slug: "dr-dimas-prakoso-demo",
+    name: "dr. Dimas Prakoso, Sp.PD",
+    specialty: "Penyakit Dalam & Pemantauan HbA1c • Profil Demo",
+    experience: "7 Tahun Pengalaman",
+    registrationNumber: "DEMO-STR-ID-012",
+    image: "/images/doctor_3.png",
+    categoryIds: ["diabetes2", "insulin"],
+  },
 ];
+
+const clinics = [
+  {
+    slug: "glucocare-jakarta-demo",
+    name: "Klinik GlucoCare Jakarta (Demo)",
+    city: "Jakarta Selatan",
+    address: "Jl. Kesehatan No. 18, Kebayoran Baru, Jakarta Selatan",
+    whatsapp: null,
+    isActive: true,
+  },
+  {
+    slug: "glucocare-bandung-demo",
+    name: "Klinik GlucoCare Bandung (Demo)",
+    city: "Bandung",
+    address: "Jl. Sehat Bersama No. 27, Sukajadi, Bandung",
+    whatsapp: null,
+    isActive: true,
+  },
+];
+
+function futureJakartaDate(daysFromNow: number, hour: number, minute = 0) {
+  const target = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1_000);
+  const jakartaDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(target);
+  return new Date(`${jakartaDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00+07:00`);
+}
 
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
@@ -127,7 +345,7 @@ async function main() {
   for (const category of categories) {
     await prisma.doctorCategory.upsert({
       where: { id: category.id },
-      update: { name: category.name },
+      update: category,
       create: category,
     });
   }
@@ -159,7 +377,55 @@ async function main() {
     });
   }
 
-  console.log("Seed admin, produk, dokter, dan kategori berhasil.");
+  const seededClinics = new Map<string, string>();
+  for (const clinicData of clinics) {
+    const clinic = await prisma.clinic.upsert({
+      where: { slug: clinicData.slug },
+      update: clinicData,
+      create: clinicData,
+    });
+    seededClinics.set(clinic.slug, clinic.id);
+  }
+
+  const seededDoctors = await prisma.doctor.findMany({
+    where: { slug: { in: doctors.slice(0, 6).map((doctor) => doctor.slug) } },
+    orderBy: { slug: "asc" },
+  });
+  const jakartaClinicId = seededClinics.get("glucocare-jakarta-demo");
+  const bandungClinicId = seededClinics.get("glucocare-bandung-demo");
+
+  for (const [doctorIndex, doctor] of seededDoctors.entries()) {
+    for (let dayOffset = 1; dayOffset <= 7; dayOffset += 2) {
+      const mode = (doctorIndex + dayOffset) % 2 === 0 ? "ONLINE" : "OFFLINE";
+      const startsAt = futureJakartaDate(dayOffset, 9 + (doctorIndex % 4), doctorIndex % 2 ? 30 : 0);
+      const endsAt = new Date(startsAt.getTime() + 45 * 60 * 1_000);
+      const clinicId = mode === "OFFLINE"
+        ? doctorIndex % 2 === 0 ? jakartaClinicId : bandungClinicId
+        : null;
+
+      await prisma.doctorScheduleSlot.upsert({
+        where: { doctorId_startsAt: { doctorId: doctor.id, startsAt } },
+        update: {
+          endsAt,
+          mode,
+          clinicId,
+          price: 225_000 + doctorIndex * 25_000,
+          notes: "Jadwal konsultasi demonstrasi",
+        },
+        create: {
+          doctorId: doctor.id,
+          clinicId,
+          mode,
+          startsAt,
+          endsAt,
+          price: 225_000 + doctorIndex * 25_000,
+          notes: "Jadwal konsultasi demonstrasi",
+        },
+      });
+    }
+  }
+
+  console.log("Seed admin, produk, dokter, klinik, dan jadwal konsultasi berhasil.");
 }
 
 main()

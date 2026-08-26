@@ -27,6 +27,8 @@ export async function listAdminChatSessions(query: AdminChatListQuery) {
         status: true,
         leadCaptured: true,
         isEmergency: true,
+        consentAt: true,
+        consentVersion: true,
         expiresAt: true,
         createdAt: true,
         updatedAt: true,
@@ -62,6 +64,8 @@ export async function getAdminChatSession(id: string) {
       status: true,
       leadCaptured: true,
       isEmergency: true,
+      consentAt: true,
+      consentVersion: true,
       expiresAt: true,
       createdAt: true,
       updatedAt: true,
@@ -69,7 +73,25 @@ export async function getAdminChatSession(id: string) {
       messages: {
         orderBy: { createdAt: "asc" },
         take: 200,
-        select: { id: true, role: true, content: true, sources: true, createdAt: true },
+        select: {
+          id: true,
+          role: true,
+          content: true,
+          sources: true,
+          relatedCare: true,
+          modelUsed: true,
+          intent: true,
+          responseLatencyMs: true,
+          gatewayLatencyMs: true,
+          gatewayAttempts: true,
+          fallbackUsed: true,
+          retrievalStatus: true,
+          retrievalLatencyMs: true,
+          retrievalMatchCount: true,
+          retrievalTopSimilarity: true,
+          feedback: true,
+          createdAt: true,
+        },
       },
       _count: { select: { messages: true } },
     },
@@ -84,16 +106,54 @@ export async function getAdminChatSession(id: string) {
 }
 
 export async function getAdminChatStats() {
-  const [total, active, completed, emergency, captured, needsReview] = await prisma.$transaction([
+  const [
+    total,
+    active,
+    completed,
+    emergency,
+    captured,
+    needsReview,
+    feedbackHelpful,
+    feedbackNotHelpful,
+    ragErrors,
+    fallbackResponses,
+    responseLatency,
+  ] = await prisma.$transaction([
     prisma.chatSession.count(),
     prisma.chatSession.count({ where: { status: "ACTIVE" } }),
     prisma.chatSession.count({ where: { status: "COMPLETED" } }),
     prisma.chatSession.count({ where: { isEmergency: true } }),
     prisma.chatSession.count({ where: { leadCaptured: true } }),
     prisma.chatLead.count({ where: { qualificationStatus: "NEEDS_REVIEW" } }),
+    prisma.chatMessageFeedback.count({ where: { rating: "HELPFUL" } }),
+    prisma.chatMessageFeedback.count({ where: { rating: "NOT_HELPFUL" } }),
+    prisma.chatMessage.count({ where: { retrievalStatus: "ERROR" } }),
+    prisma.chatMessage.count({ where: { fallbackUsed: true } }),
+    prisma.chatMessage.aggregate({
+      where: { role: "ASSISTANT", responseLatencyMs: { not: null } },
+      _avg: { responseLatencyMs: true },
+    }),
   ]);
 
-  return { total, active, completed, emergency, captured, needsReview };
+  const feedbackTotal = feedbackHelpful + feedbackNotHelpful;
+  return {
+    total,
+    active,
+    completed,
+    emergency,
+    captured,
+    needsReview,
+    feedbackHelpful,
+    feedbackNotHelpful,
+    helpfulRate: feedbackTotal > 0
+      ? Math.round((feedbackHelpful / feedbackTotal) * 100)
+      : null,
+    ragErrors,
+    fallbackResponses,
+    averageResponseLatencyMs: responseLatency._avg.responseLatencyMs
+      ? Math.round(responseLatency._avg.responseLatencyMs)
+      : null,
+  };
 }
 
 export async function updateAdminChatSession(id: string, input: AdminChatUpdate) {

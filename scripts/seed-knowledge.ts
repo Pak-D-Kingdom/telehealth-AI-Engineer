@@ -42,7 +42,6 @@ export function chunkMarkdown(content: string, documentTitle: string, maxChunkLe
         if (!cleanP) continue;
 
         if (cleanP.length > maxChunkLength) {
-          // If previous buffer exists, flush it
           if (currentBuffer.trim()) {
             chunks.push({
               title: contextualTitle,
@@ -52,7 +51,6 @@ export function chunkMarkdown(content: string, documentTitle: string, maxChunkLe
             currentBuffer = "";
           }
 
-          // Split long paragraph by sentences
           const sentences = cleanP.split(/(?<=[.!?])\s+/);
           let sentenceBuffer = "";
 
@@ -187,4 +185,3 @@ if (import.meta.main) {
       await prisma.$disconnect();
     });
 }
-

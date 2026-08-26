@@ -9,6 +9,15 @@ interface CompletionOptions {
   model?: string;
   temperature?: number;
   isVision?: boolean;
+  onMetrics?: (metrics: AIRequestMetrics) => void;
+  onModelSelected?: (model: string) => void;
+}
+
+export interface AIRequestMetrics {
+  model: string;
+  gatewayAttempts: number;
+  fallbackUsed: boolean;
+  gatewayLatencyMs: number;
 }
 
 export type AIProviderState =
@@ -17,11 +26,15 @@ export type AIProviderState =
   | "UNAVAILABLE"
   | "NOT_CONFIGURED";
 
-export interface AIProviderStatus {
-  provider: "groq";
+export interface AIModelStatus {
   model: string;
   status: AIProviderState;
   retryAfterSeconds?: number;
+}
+
+export interface AIProviderStatus extends AIModelStatus {
+  provider: "groq" | "9router";
+  models?: AIModelStatus[];
 }
 
 interface ModelHealth {
@@ -60,7 +73,7 @@ let currentGroqKeyIndex = 0;
 
 export function getAIProviderStatus(model = env.GROQ_CHAT_MODEL): AIProviderStatus {
   const { groqKeys } = getAllApiKeys();
-  if (groqKeys.length === 0) {
+  if (groqKeys.length === 0 && !env.AI_GATEWAY_API_KEY) {
     return { provider: "groq", model, status: "NOT_CONFIGURED" };
   }
 
@@ -80,7 +93,7 @@ export function getAIProviderStatus(model = env.GROQ_CHAT_MODEL): AIProviderStat
 }
 
 /**
- * Executes an LLM completion with automatic multi-key rotation (Groq key 1..N -> OpenRouter)
+ * Executes an LLM completion with automatic multi-key rotation (Groq key 1..N -> OpenRouter -> Gateway)
  */
 async function callLLMWithRotation(
   messages: Array<{ role: string; content: any; tool_calls?: any }>,
@@ -90,7 +103,7 @@ async function callLLMWithRotation(
   const { groqKeys, openRouterKeys } = getAllApiKeys();
   const totalGroq = groqKeys.length;
 
-  if (totalGroq === 0 && openRouterKeys.length === 0) {
+  if (totalGroq === 0 && openRouterKeys.length === 0 && !env.AI_GATEWAY_API_KEY) {
     throw new AppError(503, "CHATBOT_NOT_CONFIGURED", "Layanan AI belum dikonfigurasi.");
   }
 
@@ -133,9 +146,9 @@ async function callLLMWithRotation(
         continue;
       }
 
-      // Success - update active key index
       currentGroqKeyIndex = (keyIndex + 1) % totalGroq;
       markModelReady(effectiveGroqModel);
+      options.onModelSelected?.(effectiveGroqModel);
       return await response.json();
     } catch (err: any) {
       console.warn(`[Key Rotation] Error with Groq key index ${keyIndex}:`, err.message || err);
@@ -160,6 +173,7 @@ async function callLLMWithRotation(
         });
 
         if (response.ok) {
+          options.onModelSelected?.(effectiveOpenRouterModel);
           return await response.json();
         } else {
           const errorText = await response.text();
@@ -168,6 +182,32 @@ async function callLLMWithRotation(
       } catch (err) {
         console.error("[Key Rotation] OpenRouter attempt failed:", err);
       }
+    }
+  }
+
+  // 3. AI Gateway Fallback (if configured)
+  if (env.AI_GATEWAY_API_KEY) {
+    try {
+      const response = await fetch(`${env.AI_GATEWAY_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.AI_GATEWAY_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: env.AI_CHAT_MODEL || model,
+          messages,
+          max_tokens: options.maxTokens ?? 512,
+          temperature: options.temperature ?? 0.2,
+          ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
+        }),
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (err) {
+      console.error("[AI Gateway] Fallback attempt failed:", err);
     }
   }
 
@@ -181,6 +221,7 @@ export async function sendChatCompletion(
 ) {
   const model = options.model ?? env.GROQ_CHAT_MODEL;
   const payloadMessages = [{ role: "system", content: systemPrompt }, ...messages];
+  const startTime = Date.now();
 
   try {
     const data = await callLLMWithRotation(payloadMessages, model, options);
@@ -188,6 +229,12 @@ export async function sendChatCompletion(
     if (!content) {
       throw new AppError(502, "INVALID_AI_RESPONSE", "Layanan AI mengembalikan respons kosong.");
     }
+    options.onMetrics?.({
+      model,
+      gatewayAttempts: 1,
+      fallbackUsed: false,
+      gatewayLatencyMs: Date.now() - startTime,
+    });
     return content.trim();
   } catch (error) {
     if (error instanceof AppError) throw error;
@@ -203,7 +250,7 @@ export async function* streamChatCompletion(
   const { groqKeys, openRouterKeys } = getAllApiKeys();
   const payloadMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
-  // If Vision is requested, use OpenRouter with GPT-4o-mini
+  // If Vision is requested, use OpenRouter
   if (options.isVision && openRouterKeys.length > 0) {
     for (const openRouterKey of openRouterKeys) {
       try {
@@ -222,6 +269,7 @@ export async function* streamChatCompletion(
         });
 
         if (response.ok && response.body) {
+          options.onModelSelected?.("openai/gpt-4o-mini");
           for await (const data of readServerSentEvents(response.body)) {
             if (data === "[DONE]") return;
             try {
@@ -229,7 +277,7 @@ export async function* streamChatCompletion(
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) yield content;
             } catch {
-              // ignore parse errors in chunk
+              // ignore parse errors
             }
           }
           return;
@@ -262,6 +310,7 @@ export async function* streamChatCompletion(
       });
 
       if (response.ok && response.body) {
+        options.onModelSelected?.(model);
         for await (const data of readServerSentEvents(response.body)) {
           if (data === "[DONE]") return;
           try {
@@ -269,7 +318,7 @@ export async function* streamChatCompletion(
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) yield content;
           } catch {
-            // ignore parse errors in chunk
+            // ignore parse errors
           }
         }
         return;
@@ -298,6 +347,7 @@ export async function* streamChatCompletion(
         });
 
         if (response.ok && response.body) {
+          options.onModelSelected?.("meta-llama/llama-3.3-70b-instruct");
           for await (const data of readServerSentEvents(response.body)) {
             if (data === "[DONE]") return;
             try {
@@ -305,7 +355,7 @@ export async function* streamChatCompletion(
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) yield content;
             } catch {
-              // ignore parse errors in chunk
+              // ignore parse errors
             }
           }
           return;

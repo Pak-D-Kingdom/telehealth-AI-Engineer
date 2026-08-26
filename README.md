@@ -9,7 +9,7 @@ Backend API untuk aplikasi telehealth menggunakan Express.js, Bun, PostgreSQL, d
 - TypeScript
 - PostgreSQL `17` melalui Docker
 - Prisma ORM `7`
-- Groq AI SDK (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `llama-3.2-11b-vision-preview`)
+- Groq AI SDK (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `llama-3.2-11b-vision-preview`), OpenRouter, & 9Router Gateway
 - Google Gemini Embedding (`gemini-embedding-001`)
 
 ## Ekosistem AI Agents & Clinical Intelligence Engine
@@ -138,6 +138,10 @@ Respons ketika API dan database siap:
 | `GROQ_EXTRACTION_MODEL` | `llama-3.1-8b-instant` | Model ekstraksi data lead                       |
 | `GEMINI_API_KEY`    | -                            | API key Gemini untuk embedding knowledge base   |
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` | Model embedding knowledge base                  |
+| `AI_GATEWAY_BASE_URL` | `https://9router.sincan.dev/v1` | Endpoint OpenAI-compatible 9Router           |
+| `AI_GATEWAY_API_KEY` | -                           | API key yang dibuat pada dashboard 9Router      |
+| `AI_CHAT_MODEL`     | -                             | Model 9Router untuk jawaban chatbot             |
+| `AI_CHAT_FALLBACK_MODELS` | -                    | Daftar model fallback dipisahkan koma            |
 | `AI_REQUEST_TIMEOUT_MS` | `30000`                  | Batas waktu request provider AI                 |
 | `ADMIN_NAME`        | `Telehealth Admin`           | Nama admin yang dibuat oleh seed                |
 | `ADMIN_EMAIL`       | `admin@glucocare.id`         | Email login admin development                   |
@@ -145,18 +149,15 @@ Respons ketika API dan database siap:
 
 Port database menggunakan `5434` agar tidak bentrok dengan instalasi PostgreSQL lokal yang biasanya memakai `5432`. Di dalam container, PostgreSQL tetap menggunakan port `5432`.
 
-> Kredensial contoh hanya untuk development lokal. Gunakan secret yang kuat dan jangan commit `.env` untuk staging atau production.
-
 ## Prisma
 
 Schema Prisma berada di `prisma/schema.prisma` dan migration berada di `prisma/migrations`. Model awal meliputi:
 
 - User dan session admin
 - Produk
-- Dokter
-- Kategori dokter
-- Relasi dokter dan kategori
-- Session, pesan, dan lead chatbot
+- Dokter & Kategori Dokter
+- Klinik & Jadwal Konsultasi Dokter (Consultation Bookings)
+- Session, pesan, feedback, dan lead chatbot
 - Knowledge base dengan embedding pgvector
 
 Setelah menambahkan atau mengubah model, buat migration dengan:
@@ -177,13 +178,11 @@ Buka Prisma Studio untuk melihat data:
 bun run db:studio
 ```
 
-Seed bersifat idempotent dan dapat dijalankan kembali. Seed akan memperbarui akun admin berdasarkan environment serta membuat data awal produk, dokter demo, dan kategori:
+Seed bersifat idempotent dan dapat dijalankan kembali:
 
 ```bash
 bun run db:seed
 ```
-
-Data dokter dari seed adalah data demo dan bukan identitas tenaga medis yang telah diverifikasi.
 
 ## Autentikasi Admin
 
@@ -198,20 +197,6 @@ curl -i \
   -d '{"email":"admin@glucocare.id","password":"change-this-local-password"}' \
   http://localhost:4000/api/auth/login
 ```
-
-Periksa session:
-
-```bash
-curl -b cookies.txt http://localhost:4000/api/auth/me
-```
-
-Logout:
-
-```bash
-curl -X POST -b cookies.txt http://localhost:4000/api/auth/logout
-```
-
-Frontend harus mengirim request autentikasi dengan opsi `credentials: "include"`.
 
 ## Endpoint API
 
@@ -235,32 +220,9 @@ Endpoint chatbot publik (menggunakan cookie session HTTP-only):
 | `POST`   | `/api/chat/stream`       | Mengirim pesan dengan respons SSE streaming     |
 | `POST`   | `/api/chat/retry`        | Mencoba ulang pesan terakhir via JSON            |
 | `POST`   | `/api/chat/retry/stream` | Mencoba ulang pesan terakhir via SSE             |
+| `POST`   | `/api/chat/messages/:messageId/feedback` | Menyimpan feedback jawaban AI   |
 | `GET`    | `/api/chat/status`       | Status provider dan jeda pemulihan kuota        |
 | `DELETE` | `/api/chat`              | Menutup session untuk percakapan baru            |
-
-Event SSE yang dikirim adalah `meta`, `token`, `done`, atau `error`. Event `meta` dan `done`
-menyertakan referensi knowledge base yang digunakan.
-
-Endpoint autentikasi:
-
-| Method | Endpoint           | Keterangan                             |
-| ------ | ------------------ | -------------------------------------- |
-| `POST` | `/api/auth/login`  | Login admin dan membuat session cookie |
-| `POST` | `/api/auth/logout` | Menghapus session                      |
-| `GET`  | `/api/auth/me`     | Mengambil admin yang sedang login      |
-
-Endpoint admin yang membutuhkan session:
-
-| Method   | Endpoint              | Keterangan                              |
-| -------- | --------------------- | --------------------------------------- |
-| `GET`    | `/api/admin/products` | Daftar seluruh produk termasuk nonaktif |
-| `POST`   | `/api/products`       | Membuat produk                          |
-| `PATCH`  | `/api/products/:id`   | Memperbarui produk                      |
-| `DELETE` | `/api/products/:id`   | Menghapus produk                        |
-| `GET`    | `/api/admin/doctors`  | Daftar seluruh dokter termasuk nonaktif |
-| `POST`   | `/api/doctors`        | Membuat dokter                          |
-| `PATCH`  | `/api/doctors/:id`    | Memperbarui dokter                      |
-| `DELETE` | `/api/doctors/:id`    | Menghapus dokter                        |
 
 Endpoint AI Clinical Tools & Admin Intelligence:
 
@@ -276,8 +238,6 @@ Endpoint AI Clinical Tools & Admin Intelligence:
 | `GET`  | `/api/ai/inventory/forecast`          | Peramalan stok obat/alat, runout days, dan saran EOQ    |
 | `POST` | `/api/ai/inventory/query`             | Tanya jawab interaktif dengan AI Procurement Advisor    |
 
-Endpoint daftar mendukung `page`, `limit`, dan `search`. Produk mendukung filter `category`, sedangkan dokter mendukung `categoryId`. Endpoint admin juga mendukung `active=true` atau `active=false`.
-
 ## Pengujian
 
 Pastikan PostgreSQL aktif, migration sudah diterapkan, dan seed sudah dijalankan. Kemudian jalankan:
@@ -286,8 +246,6 @@ Pastikan PostgreSQL aktif, migration sudah diterapkan, dan seed sudah dijalankan
 bun run typecheck
 bun run test
 ```
-
-Integration test memeriksa health check, data publik, proteksi route admin, login gagal, login berhasil, CRUD produk/dokter, dan logout. Data sementara test dibersihkan setelah pengujian.
 
 ## Perintah yang Tersedia
 
@@ -305,7 +263,8 @@ Integration test memeriksa health check, data publik, proteksi route admin, logi
 | `bun run db:migrate -- --name ...` | Membuat dan menjalankan migration development |
 | `bun run db:deploy` | Menjalankan migration untuk deployment |
 | `bun run db:seed` | Mengisi atau memperbarui data awal |
+| `bun run db:seed:knowledge` | Membuat ulang embedding knowledge base |
 | `bun run db:studio` | Membuka Prisma Studio |
 | `bun run test` | Menjalankan integration test API |
-
-> Proyek ini menggunakan Bun sebagai package manager. Jangan menjalankan `npm install` agar tidak membuat lockfile lain.
+| `bun run test:eval` | Menjalankan kasus evaluasi deterministik |
+| `bun run test:e2e:chat` | Menjalankan pengujian chatbot end-to-end |

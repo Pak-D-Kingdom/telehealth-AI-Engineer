@@ -16,6 +16,7 @@ import { errorHandler, notFoundHandler } from "./middlewares/error-handler";
 import { chatRouter } from "./routes/chat.routes";
 import { adminChatRouter } from "./routes/admin-chat.routes";
 import { aiRouter } from "./routes/ai.routes";
+import { adminConsultationRouter } from "./routes/admin-consultation.routes";
 
 export const app = express();
 
@@ -68,6 +69,7 @@ app.use("/api/chat", chatRouter);
 app.use("/api/admin/chat", adminChatRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/food", aiRouter);
+app.use("/api/admin/consultations", adminConsultationRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
